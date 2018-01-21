@@ -1,6 +1,9 @@
 SafeYAML
 ========
 
+NOTE: This is a speculative README from @aanand, and a speculative attempt at
+implementation & specification by @tef.
+
 SafeYAML is an aggressively small subset of YAML. It's everything you need for
 human-readable-and-writable configuration files, and nothing more.
 
