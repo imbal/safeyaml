@@ -28,12 +28,23 @@ indented_object = indent key ': ' indented_value (key ': ' idented_value)  deden
 
 indented_list = indent '- ' indented_value (key ': ' idented_value)  dedent
 
-## issues
+## lint errors
 
+- tabs in indentation
 - allowed root objects
-- missing values?
+- missing values in dict
 - empty document?
+- Yes/No/Off/On
 - octal, hex, sexagesimal errors
-- printables, unicode, surrogates
-- duplicate kes, normalisation
-- barewords, yaml operators that are missing, '---' '%', etc
+- tags, local/builtin
+- anchors/aliases
+- directives
+- string contents: printables, unicode, surrogates
+- string escapes: \nl & trailing whitespace
+- dict contents: duplicate keys, normalisation
+- document seperators
+- "?" key syntax, "|"/">" flow modes
+- barewords
+- reserved '`' and '@'
+
+
