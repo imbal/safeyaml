@@ -21,10 +21,11 @@ It's best described as JSON plus the following:
 
 With the following minor YAML features:
 
-- Any JSON/YAML Value can be the root value, not just lists or objects.
-- Trailing commas allowed within `[]` or `{}`.
-- `\xFF`, `\UFFFFFFFF`, along with \uFFFF for escaping code points.
-- A Byte Order Mark codepoint is ignored at the start of a document.
+- Any JSON/YAML Value can be the root value, not just lists or objects
+- Strings can be inside ``""`` or ``''``
+- Trailing commas allowed within ``[]`` or `{}``
+- ``\xFF``, ``\UFFFFFFFF``, along with ``\uFFFF`` for escaping code points
+- A Byte Order Mark codepoint is ignored at the start of a document
 
 
 Here's an example::

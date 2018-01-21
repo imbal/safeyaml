@@ -7,12 +7,13 @@ import json
 
 from collections import namedtuple, OrderedDict
 
-whitespace = re.compile(r"(?:\ |\t|\r|\n|#[^\r\n]*(?:\r?\n|$))+")
+whitespace = re.compile(r"(?:\ |\t|\r|\n)+")
+        
+comment = re.compile(r"(#[^\r\n]*(?:\r?\n|$))+")
 
-int_b10 = re.compile(r"\d[\d_]*")
-
-flt_b10 = re.compile(r"\.[\d_]+")
-exp_b10 = re.compile(r"[eE](?:\+|-)?[\d+_]")
+int_b10 = re.compile(r"\d[\d]*")
+flt_b10 = re.compile(r"\.[\d]+")
+exp_b10 = re.compile(r"[eE](?:\+|-)?[\d+]")
 
 string_dq = re.compile(
     r'"(?:[^"\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\'"\\/bfnrt]|\\\r?\n|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"')
@@ -33,19 +34,7 @@ str_escapes = {
     '\\': '\\',
 }
 
-escaped = {
-    '\b': '\\b',
-    '\n': '\\n',
-    '\f': '\\f',
-    '\r': '\\r',
-    '\t': '\\t',
-    '"': '\\"',
-    "'": "\\'",
-    '\\': '\\\\',
-}
-
 builtin_names = {'null': None, 'true': True, 'false': False}
-builtin_values = {None: 'null', True: 'true', False: 'false'}
 
 class ParserErr(Exception):
     def __init__(self, buf, pos, reason=None):
@@ -66,9 +55,12 @@ def parse(buf, transform=None):
     obj, pos = parse_structure(buf, pos, transform)
 
     m = whitespace.match(buf, pos)
-    if m:
+    while m:
         pos = m.end()
-        m = whitespace.match(buf, pos)
+        m = comment.match(buf, pos)
+        if m:
+            pos = m.end()
+            m = whitespace.match(buf, pos)
 
     if pos != len(buf):
         raise ParserErr(buf, pos, "Trailing content: {}".format(
@@ -82,8 +74,12 @@ def parse_structure(buf, pos, transform):
 
 def parse_object(buf, pos, transform=None):
     m = whitespace.match(buf, pos)
-    if m:
+    while m:
         pos = m.end()
+        m = comment.match(buf, pos)
+        if m:
+            pos = m.end()
+            m = whitespace.match(buf, pos)
 
     peek = buf[pos]
 
@@ -186,56 +182,32 @@ def parse_object(buf, pos, transform=None):
         while lo < end - 1:
             hi = buf.find("\\", lo, end)
             if hi == -1:
-                if ascii:
-                    s.extend(buf[lo:end - 1].encode('ascii'))
-                else:
-                    s.write(buf[lo:end - 1])  # skip quote
+                s.write(buf[lo:end - 1])  # skip quote
                 break
 
-            if ascii:
-                s.extend(buf[lo:hi].encode('ascii'))
-            else:
-                s.write(buf[lo:hi])
+            s.write(buf[lo:hi])
 
             esc = buf[hi + 1]
             if esc in str_escapes:
-                if ascii:
-                    s.extend(byte_escapes[esc])
-                else:
-                    s.write(str_escapes[esc])
+                s.write(str_escapes[esc])
                 lo = hi + 2
             elif esc == 'x':
                 n = int(buf[hi + 2:hi + 4], 16)
-                if ascii:
-                    s.append(n)
-                else:
-                    s.write(chr(n))
+                s.write(chr(n))
                 lo = hi + 4
             elif esc == 'u':
                 n = int(buf[hi + 2:hi + 6], 16)
-                if ascii:
-                    if n > 0xFF:
-                        raise ParserErr(
-                            buf, hi, 'bytestring cannot have escape > 255')
-                    s.append(n)
-                else:
-                    if 0xD800 <= n <= 0xDFFF:
-                        raise ParserErr(
-                            buf, hi, 'string cannot have surrogate pairs')
-                    s.write(chr(n))
+                if 0xD800 <= n <= 0xDFFF:
+                    raise ParserErr(
+                        buf, hi, 'string cannot have surrogate pairs')
+                s.write(chr(n))
                 lo = hi + 6
             elif esc == 'U':
                 n = int(buf[hi + 2:hi + 10], 16)
-                if ascii:
-                    if n > 0xFF:
-                        raise ParserErr(
-                            buf, hi, 'bytestring cannot have escape > 255')
-                    s.append(n)
-                else:
-                    if 0xD800 <= n <= 0xDFFF:
-                        raise ParserErr(
-                            buf, hi, 'string cannot have surrogate pairs')
-                    s.write(chr(n))
+                if 0xD800 <= n <= 0xDFFF:
+                    raise ParserErr(
+                        buf, hi, 'string cannot have surrogate pairs')
+                s.write(chr(n))
                 lo = hi + 10
             elif esc == '\n':
                 lo = hi + 2
@@ -258,15 +230,15 @@ def parse_object(buf, pos, transform=None):
 
         sign = +1
 
+        start = pos
+
         if buf[pos] in "+-":
             if buf[pos] == "-":
                 sign = -1
             pos += 1
         peek = buf[pos]
 
-        if peek == '0'
-            raise Exception('Leading Zero')
-
+        leading_zero = (peek == '0')
         m = int_b10.match(buf, pos)
         if m:
             int_end = m.end()
@@ -285,9 +257,11 @@ def parse_object(buf, pos, transform=None):
             end = exp_end
 
         if flt_end or exp_end:
-            out = sign * float(buf[pos:end].replace('_', ''))
+            out = sign * float(buf[pos:end])
         else:
-            out = sign * int(buf[pos:end].replace('_', ''), 10)
+            out = sign * int(buf[pos:end])
+            if leading_zero and out != 0:
+                raise Exception('Nope')
 
         if transform is not None:
             out = transform(out)
@@ -315,4 +289,20 @@ def parse_object(buf, pos, transform=None):
 
 
 if __name__ == '__main__':
-    print(parse("123"))
+    tests = """
+        0
+        1.2
+        -3.4
+        +5.6
+        "test"
+        'test'
+        [1,2,3]
+        [1,2,3]
+        {"a":1}
+        {'b':2}
+        1 # foo """
+    for test in tests.split("\n"):
+        test.strip()
+        if not test: continue
+        print(repr(test))
+        print('=>', parse(test))
