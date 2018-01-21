@@ -34,7 +34,7 @@ Here's an example::
     ports: [
       8000,
       8001,
-      8002,   # trailing commas are *required* in multi-line structures
+      8002,   
     ]
 
     enabled: true

@@ -52,6 +52,7 @@ class ParserErr(Exception):
 
 def parse(buf, transform=None):
     pos = 1 if buf.startswith("\uFEFF") else 0
+    output = []
     obj, pos = parse_structure(buf, pos, transform)
 
     m = whitespace.match(buf, pos)

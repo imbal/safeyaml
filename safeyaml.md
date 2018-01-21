@@ -22,11 +22,16 @@ number = integer | floating_point
 
 builtin = 'null' | 'true' | 'false'
 
+indented_key :== string | bareword
+
 indented_value :== indented_object | indented_list | value
 
-indented_object = indent key ': ' indented_value (key ': ' idented_value)  dedent
+indented_object :== indent indented_key ': ' indented_value (nl indented_key ': ' idented_value)  dedent
 
-indented_list = indent '- ' indented_value (key ': ' idented_value)  dedent
+indented_list :== indent '- ' indented_value (nl '- ' idented_value)  dedent
+
+where indent/dedent happen like in python's lexer, when the indent is bigger/smaller, with an implied indent/dedent
+around whole stream
 
 ## lint errors
 
