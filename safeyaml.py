@@ -6,7 +6,8 @@ import base64
 import json
 
 from collections import namedtuple, OrderedDict
-
+from enum import Enum
+    
 whitespace = re.compile(r"(?:\ |\t|\r|\n)+")
         
 comment = re.compile(r"(#[^\r\n]*(?:\r?\n|$))+")
@@ -52,8 +53,9 @@ class ParserErr(Exception):
 
 def parse(buf, transform=None):
     pos = 1 if buf.startswith("\uFEFF") else 0
-    output = []
-    obj, pos = parse_structure(buf, pos, transform)
+
+    output = io.StringIO()
+    obj, pos = parse_structure(buf, pos, output, transform)
 
     m = whitespace.match(buf, pos)
     while m:
@@ -67,13 +69,13 @@ def parse(buf, transform=None):
         raise ParserErr(buf, pos, "Trailing content: {}".format(
             repr(buf[pos:pos + 10])))
 
-    return obj
+    return obj, output.getvalue()
 
 
-def parse_structure(buf, pos, transform):
-    return parse_object(buf, pos,transform)
+def parse_structure(buf, pos, output, transform):
+    return parse_object(buf, pos, output, transform)
 
-def parse_object(buf, pos, transform=None):
+def parse_object(buf, pos, output, transform=None):
     m = whitespace.match(buf, pos)
     while m:
         pos = m.end()
@@ -93,7 +95,7 @@ def parse_object(buf, pos, transform=None):
             pos = m.end()
 
         while buf[pos] != '}':
-            key, pos = parse_object(buf, pos, transform)
+            key, pos = parse_object(buf, pos, output, transform)
 
             if key in out:
                 raise SemanticErr('duplicate key: {}, {}'.format(key, out))
@@ -112,9 +114,13 @@ def parse_object(buf, pos, transform=None):
                 raise ParserErr(
                     buf, pos, "Expected key:value pair but found {}".format(repr(peek)))
 
-            item, pos = parse_object(buf, pos, transform)
+            item, pos = parse_object(buf, pos, output, transform)
 
             out[key] = item
+
+            m = whitespace.match(buf, pos)
+            if m:
+                pos = m.end()
 
             peek = buf[pos]
             if peek == ',':
@@ -124,7 +130,7 @@ def parse_object(buf, pos, transform=None):
                     pos = m.end()
             elif peek != '}':
                 raise ParserErr(
-                    buf, pos, "Expecting a ',', or a '}' but found {}".format(repr(peek)))
+                    buf, pos, "Expecting a ',', or a '{}' but found {}".format('}',repr(peek)))
         if transform is not None:
             out = transform(out)
         return out, pos + 1
@@ -139,7 +145,7 @@ def parse_object(buf, pos, transform=None):
             pos = m.end()
 
         while buf[pos] != ']':
-            item, pos = parse_object(buf, pos, transform)
+            item, pos = parse_object(buf, pos, output, transform)
             out.append(item)
 
             m = whitespace.match(buf, pos)
