@@ -21,15 +21,8 @@ It's best described as JSON plus the following:
 - You can use indentation for structure (braces are optional)
 - Keys can be unquoted (``foo: 1``, rather than ``"foo": 1``)
 - Single-line comments with ``#``
-
-With the following minor YAML features:
-
-- Any JSON/YAML Value can be the root value, not just lists or objects
 - Strings can be inside ``""`` or ``''``
 - Trailing commas allowed within ``[]`` or `{}``
-- ``\xFF``, ``\UFFFFFFFF``, along with ``\uFFFF`` for escaping code points
-- A Byte Order Mark codepoint is ignored at the start of a document
-
 
 Here's an example::
 
