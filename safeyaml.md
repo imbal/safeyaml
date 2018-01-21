@@ -1,5 +1,7 @@
 # specification
 
+## grammar
+
 ws = (whitespace| newline | comment)*
 
 document :== bom? ws root ws
@@ -25,3 +27,13 @@ indented_value :== indented_object | indented_list | value
 indented_object = indent key ': ' indented_value (key ': ' idented_value)  dedent
 
 indented_list = indent '- ' indented_value (key ': ' idented_value)  dedent
+
+## issues
+
+- allowed root objects
+- missing values?
+- empty document?
+- octal, hex, sexagesimal errors
+- printables, unicode, surrogates
+- duplicate kes, normalisation
+- barewords, yaml operators that are missing, '---' '%', etc

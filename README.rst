@@ -19,9 +19,8 @@ What's allowed?
 It's best described as JSON plus the following:
 
 - You can use indentation for structure (braces are optional)
-- Keys can be unquoted (``foo: 1``, rather than ``"foo": 1``)
+- Keys can be unquoted (``foo: 1``, rather than ``"foo": 1``), or use ``''``'s too
 - Single-line comments with ``#``
-- Strings can be inside ``""`` or ``''``
 - Trailing commas allowed within ``[]`` or `{}``
 
 Here's an example::
