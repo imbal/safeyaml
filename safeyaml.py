@@ -297,9 +297,9 @@ if __name__ == '__main__':
         "test"
         'test'
         [1,2,3]
-        [1,2,3]
+        [1,2,3,]
         {"a":1}
-        {'b':2}
+        {'b':2,}
         1 # foo """
     for test in tests.split("\n"):
         test.strip()

@@ -60,7 +60,7 @@ values must be written as ``true`` or ``false`` (``yes``, ``Y``, ``y``, ``on``
 etc are not allowed).
 
 No anchors, no references. No multi-line strings. No multi-document streams. No
-custom tagged values. *No sexagesimal numbers.*
+custom tagged values. No Octal. *No sexagesimal numbers.*
 
 
 Why?
