@@ -75,24 +75,30 @@ def parse(buf, transform=None):
 def parse_structure(buf, pos, output, transform):
     return parse_object(buf, pos, output, transform)
 
-def parse_object(buf, pos, output, transform=None):
+def skip_whitespace(buf, pos, output):
     m = whitespace.match(buf, pos)
     while m:
+        output.write(buf[pos:m.end()])
         pos = m.end()
         m = comment.match(buf, pos)
         if m:
+            output.write(buf[pos:m.end()])
             pos = m.end()
             m = whitespace.match(buf, pos)
+    return pos
+
+
+def parse_object(buf, pos, output, transform=None):
+    pos = skip_whitespace(buf, pos, output)
 
     peek = buf[pos]
 
     if peek == '{':
+        output.write('{')
         out = OrderedDict()
 
         pos += 1
-        m = whitespace.match(buf, pos)
-        if m:
-            pos = m.end()
+        pos = skip_whitespace(buf, pos, output)
 
         while buf[pos] != '}':
             key, pos = parse_object(buf, pos, output, transform)
@@ -100,16 +106,16 @@ def parse_object(buf, pos, output, transform=None):
             if key in out:
                 raise SemanticErr('duplicate key: {}, {}'.format(key, out))
 
-            m = whitespace.match(buf, pos)
-            if m:
-                pos = m.end()
+            pos = skip_whitespace(buf, pos, output)
 
             peek = buf[pos]
+
+            ### bare key check
+
             if peek == ':':
+                output.write(':')
                 pos += 1
-                m = whitespace.match(buf, pos)
-                if m:
-                    pos = m.end()
+                pos = skip_whitespace(buf, pos, output)
             else:
                 raise ParserErr(
                     buf, pos, "Expected key:value pair but found {}".format(repr(peek)))
@@ -118,46 +124,41 @@ def parse_object(buf, pos, output, transform=None):
 
             out[key] = item
 
-            m = whitespace.match(buf, pos)
-            if m:
-                pos = m.end()
+            pos = skip_whitespace(buf, pos, output)
 
             peek = buf[pos]
             if peek == ',':
                 pos += 1
-                m = whitespace.match(buf, pos)
-                if m:
-                    pos = m.end()
+                output.write(',')
+                pos = skip_whitespace(buf, pos, output)
             elif peek != '}':
                 raise ParserErr(
                     buf, pos, "Expecting a ',', or a '{}' but found {}".format('}',repr(peek)))
+
+        output.write('}')
         if transform is not None:
             out = transform(out)
         return out, pos + 1
 
     elif peek == '[':
+        output.write("[")
         out = []
 
         pos += 1
 
-        m = whitespace.match(buf, pos)
-        if m:
-            pos = m.end()
+        pos = skip_whitespace(buf, pos, output)
 
         while buf[pos] != ']':
             item, pos = parse_object(buf, pos, output, transform)
             out.append(item)
 
-            m = whitespace.match(buf, pos)
-            if m:
-                pos = m.end()
+            pos = skip_whitespace(buf, pos, output)
 
             peek = buf[pos]
             if peek == ',':
+                output.append(',')
                 pos += 1
-                m = whitespace.match(buf, pos)
-                if m:
-                    pos = m.end()
+                pos = skip_whitespace(buf, pos, output)
             elif peek != ']':
                 raise ParserErr(
                     buf, pos, "Expecting a ',', or a ']' but found {}".format(repr(peek)))
@@ -176,12 +177,14 @@ def parse_object(buf, pos, output, transform=None):
             m = string_sq.match(buf, pos)
             if m:
                 end = m.end()
+                output.write(buf[pos:end])
             else:
                 raise ParserErr(buf, pos, "Invalid single quoted string")
         else:
             m = string_dq.match(buf, pos)
             if m:
                 end = m.end()
+                output.write(buf[pos:end])
             else:
                 raise ParserErr(buf, pos, "Invalid double quoted string")
 
@@ -225,6 +228,8 @@ def parse_object(buf, pos, output, transform=None):
                     buf, hi, "Unkown escape character {}".format(repr(esc)))
 
         out = s.getvalue()
+
+        # XXX output.write string.escape
 
         if transform is not None:
             out = transform(out)
@@ -270,6 +275,8 @@ def parse_object(buf, pos, output, transform=None):
             if leading_zero and out != 0:
                 raise Exception('Nope')
 
+        output.write(buf[start:end])
+
         if transform is not None:
             out = transform(out)
         return out, end
@@ -287,6 +294,7 @@ def parse_object(buf, pos, output, transform=None):
                 buf, pos, "{} is not a recognised built-in".format(repr(item)))
 
         out = builtin_names[item]
+        output.write(item)
 
         if transform is not None:
             out = transform(out)
@@ -312,4 +320,4 @@ if __name__ == '__main__':
         test.strip()
         if not test: continue
         print(repr(test))
-        print('=>', parse(test))
+        print('=>', parse(test)[0])
