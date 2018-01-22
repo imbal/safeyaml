@@ -104,13 +104,13 @@ class UnsupportedEscape(ParserErr):
     pass
 
 
-def parse(buf, options=None):
+def parse(buf, output=None, options=None):
     if not buf:
         raise NoRootDocument(buf, pos, "Empty Document")
 
+    output = output or io.StringIO()
     pos = 1 if buf.startswith("\uFEFF") else 0
 
-    output = io.StringIO()
     obj, pos = parse_structure(buf, pos, output, options, at_root=True)
 
     m = whitespace.match(buf, pos)
@@ -125,7 +125,7 @@ def parse(buf, options=None):
         raise TrailingContent(buf, pos, "Trailing content: {}".format(
             repr(buf[pos:pos + 10])))
 
-    return obj, output.getvalue()
+    return obj
 
 def move_to_next(buf, pos):
     line_pos = pos
@@ -503,8 +503,9 @@ def parse_string(buf, pos, output, options):
     return out, end
 
 def process(input_fh, output_fh):
-    obj, output = parse(input_fh.read())
-    output_fh.write(output)
+    output = io.StringIO()
+    obj, output = parse(input_fh.read(), output=output, options=None)
+    output_fh.write(output.getvalue())
     return obj
 
 
