@@ -71,8 +71,111 @@ def parse(buf, transform=None):
 
     return obj, output.getvalue()
 
+def move_to_next(buf, pos):
+    line_pos = pos
+    next_line = False
+    while pos < len(buf):
+        peek = buf[pos]
 
-def parse_structure(buf, pos, output, transform):
+        if peek == ' ':
+            pos +=1
+        elif peek == '\n' or peek == '\r':
+            pos +=1
+            line_pos = pos
+            next_line = True
+        elif peek == '#':
+            next_line = True
+            while pos < len(buf):
+                pos +=1
+                if buf[pos] == '\n':
+                    line_pos = pos
+                    break 
+        else:
+            break
+    return pos, pos-line_pos, next_line
+
+def parse_structure(buf, pos, output, transform, indent=0):
+    start = pos
+    pos, my_indent, next_line = move_to_next(buf, pos)
+
+    if my_indent < indent:
+        raise ParserErr(buf, pos, "Unexpected dedent")
+
+    output.write(buf[start:pos])
+    peek = buf[pos]
+    
+    if peek == '-':
+        out = []
+        print(indent, my_indent, out)
+        while pos < len(buf):
+            if buf[pos] != '-':
+                break
+            output.write("-")
+            pos +=1
+            if buf[pos] not in (' ', '\r','\n'):
+                raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
+
+            new_pos, new_indent, next_line = move_to_next(buf, pos)
+            if next_line and new_indent < my_indent:
+                raise ParserErr(buf, new_pos, "Unexpected dedent")
+
+            if not next_line:
+                output.write(buf[pos:new_pos])
+                obj, pos = parse_object(buf, new_pos, output, transform)
+            else:
+                obj, pos = parse_structure(buf, pos, output, transform, indent=my_indent)
+
+            out.append(obj)
+
+            new_pos, new_indent, next_line = move_to_next(buf, pos)
+            if not next_line or new_indent != my_indent:
+                break
+            else:
+                output.write(buf[pos:new_pos])
+                pos = new_pos
+                    
+        return out, pos
+    m = identifier.match(buf, pos)
+    if m:
+        out = OrderedDict()
+
+        while pos < len(buf):
+            m = identifier.match(buf, pos)
+            if not m:
+                break
+            else:
+                name = buf[pos:m.end()]
+                output.write(buf[pos:m.end()])
+                pos = m.end()
+
+            if buf[pos] != ':':
+                raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
+            output.write(":")
+            pos +=1
+            if buf[pos] not in (' ', '\r','\n'):
+                raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
+
+            new_pos, new_indent, next_line = move_to_next(buf, pos)
+            if next_line and new_indent < my_indent:
+                raise ParserErr(buf, new_pos, "Unexpected dedent")
+
+            if not next_line:
+                output.write(buf[pos:new_pos])
+                obj, pos = parse_object(buf, new_pos, output, transform)
+            else:
+                obj, pos = parse_structure(buf, pos, output, transform, indent=my_indent)
+
+            out[name] = obj
+
+            new_pos, new_indent, next_line = move_to_next(buf, pos)
+            if not next_line or new_indent != my_indent:
+                break
+            else:
+                output.write(buf[pos:new_pos])
+                pos = new_pos
+                    
+        return out, pos
+        return out, pos
     return parse_object(buf, pos, output, transform)
 
 def skip_whitespace(buf, pos, output):

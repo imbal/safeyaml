@@ -33,6 +33,49 @@ indented_list :== indent '- ' indented_value (nl '- ' idented_value)  dedent
 where indent/dedent happen like in python's lexer, when the indent is bigger/smaller, with an implied indent/dedent
 around whole stream
 
+i.e
+
+```
+- 1
+- 2
+```
+
+```
+name:
+ - list
+otherName: {"a": value}
+```
+
+can't nest indentation directives on same line
+
+```
+- a: thing
+- - thing
+  - thing
+```
+
+```
+- 
+ a: thing
+-
+ - thing
+ - thing
+```
+
+indentation level must increase
+
+```
+a: 
+- what
+```
+
+but
+
+```
+a:
+ - what
+```
+
 ## lint errors
 
 - tabs in indentation
