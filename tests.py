@@ -77,7 +77,7 @@ def test_spec(test):
 
 if __name__ == '__main__':
     smoke_tests()
-    for spec in glob.glob("spec/*.yaml"):
+    for spec in glob.glob("test/*.yaml"):
         test_spec(spec)
     print()
 
