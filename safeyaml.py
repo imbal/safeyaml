@@ -50,6 +50,7 @@ class ParserErr(Exception):
                 nl = pos - 5
             reason = "Unknown Character {} (context: {})".format(
                 repr(buf[pos]), repr(buf[pos - 10:pos + 5]))
+        self.reason = reason
         Exception.__init__(self, "{} (at pos={})".format(reason, pos))
 
 
@@ -89,7 +90,6 @@ class ObjectIndentationErr(SyntaxErr):
 
 class TrailingContent(SyntaxErr):
     pass
-
 
 class UnsupportedYAML(ParserErr):
     pass
@@ -154,6 +154,12 @@ def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
 
     output.write(buf[start:pos])
     peek = buf[pos]
+
+    if peek in ('*', '&', '?', '|', '<', '>', '%',):
+        raise UnsupportedYAML(buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
+
+    if peek == '-' and buf[pos:pos+3] == '---':
+        raise UnsupportedYAML(buf, pos, "A SafeYAML document is a single document, '---' separators are unsupported")
     
     if peek == '-':
         out = []
@@ -507,17 +513,23 @@ if __name__ == '__main__':
     action = args.action[0]
 
     in_fh, out_fh = sys.stdin, sys.stdout
+    filename = "<stdin>"
 
     if args.file:
         in_fh = open(args.file) # closed on exit
+        filename = args.file
 
-    if action == 'check':
-        process(in_fh, out_fh)
-    elif action == 'fix':
-        raise Exception('unimplemented')
-    else:
-        parser.print_help()
-        sys.exit(-1)
+    try:
+        if action == 'check':
+            process(in_fh, out_fh)
+        elif action == 'fix':
+            raise Exception('unimplemented')
+        else:
+            parser.print_help()
+            sys.exit(-1)
+    except ParserErr as p:
+        print("{}:{}:{}".format(filename, p.pos, p.reason), file=sys.stderr)
+        sys.exit(-2)
 
     sys.exit(0)
 
