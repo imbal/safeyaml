@@ -23,7 +23,7 @@ string_sq = re.compile(
     r"'(?:[^'\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\"'\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*'")
 
 identifier = re.compile(r"(?!\d)[\w\.]+")
-barewords = re.compile(r"(?!\d)[\w\.]+(?:(?![\r\n$@,:\"'\[\]\&\*\<\>]).)+")
+barewords = re.compile(r"(?!\d)[\w\.]+(?:(?![\r\n#$@%`,:\"\|'\[\]\{\}\&\*\?\<\>]).)*")
 
 key_name = re.compile("(?:{}|{}|{})".format(string_dq.pattern, string_sq.pattern, identifier.pattern))
 
@@ -542,55 +542,51 @@ def parse_bareword(buf, pos, output, options):
         m = barewords.match(buf, pos)
         if m:
             end = m.end()
-            item = buf[pos:end]
+            item = buf[pos:end].strip()
             output.write('"{}"'.format(item))
+            if buf[end:end+1] not in ('', '\r', '\n', '#'):
+                raise Bareword(buf, pos, "The parser is trying its very best but could only make out '{}', but there is other junk on that line. You fix it.".format(item))
+            elif buf[end:end+1] == '#':
+                output.write(' ')
+
             return item, m.end()
     raise Bareword(buf, pos, "The parser doesn't know how to parse anymore and has given up. Use less barewords")
-
-
-def process(input_fh, output_fh, options):
-    output = io.StringIO()
-    obj = parse(input_fh.read(), output=output, options=options)
-    output_fh.write(output.getvalue())
-    return obj
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="SafeYAML Linter, checks (or formats) a YAML file for common ambiguities")
 
-    parser.add_argument("action", nargs=1, help="check or fix or json", default=None)
     parser.add_argument("file", nargs="?", default=None, help="filename to read, without will read from stdin")
-    parser.add_argument("--allow-barewords",  action='store_true', default=False)
+    parser.add_argument("--allow-barewords",  action='store_true', default=False, help="ask the parser to try its best to parse barewords")
+    parser.add_argument("--quiet", action='store_true', default=False, help="don't print cleaned file")
+    parser.add_argument("--json", action='store_true', default=False, help="output json instead of yaml")
 
     args = parser.parse_args() # will only return when action is given
 
-    action = args.action[0]
 
-    in_fh, out_fh = sys.stdin, sys.stdout
+    input_fh, output_fh = sys.stdin, sys.stdout
     filename = "<stdin>"
     
     options = Options(allow_barewords=args.allow_barewords)
 
     if args.file:
-        in_fh = open(args.file) # closed on exit
+        input_fh = open(args.file) # closed on exit
         filename = args.file
 
     try:
-        if action == 'check':
-            process(in_fh, out_fh, options)
-        elif action == 'fix':
-            raise Exception('unimplemented')
-        elif action == 'json':
-            output = io.StringIO()
-            obj= parse(in_fh.read(), output=output, options=options)
-            json.dump(obj, out_fh)
-        else:
-            parser.print_help()
-            sys.exit(-1)
+        output = io.StringIO()
+        obj = parse(input_fh.read(), output=output, options=options)
     except ParserErr as p:
         line, col = get_position(p.buf, p.pos)
         print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
         sys.exit(-2)
+
+    if not args.quiet:
+
+        if args.json:
+            json.dump(obj, output_fh)
+        else:
+            output_fh.write(output.getvalue())
 
     sys.exit(0)
 

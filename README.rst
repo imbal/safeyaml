@@ -86,7 +86,7 @@ with an error if it can't. Here's an example of a validate::
   $ cat input.yaml
   title: My YAML file
 
-  $ safeyaml check input.yaml
+  $ safeyaml input.yaml
   title: "My YAML file"
 
 
@@ -95,7 +95,7 @@ Here's an example of an error, which must be fixed manually::
   $ cat input.yaml
   command: yes
 
-  $ safeyaml check input.yaml
+  $ safeyaml input.yaml
   input.yaml:1:11:Can't use 'yes' as a value. Please either surround it in quotes
   if it's a string, or replace it with `true` if it's a boolean.
 
