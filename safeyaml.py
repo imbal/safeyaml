@@ -41,11 +41,24 @@ builtin_names = {'null': None, 'true': True, 'false': False}
 
 reserved_names = set("yes|no|on|off".split("|"))
 
+newlines = re.compile(r'\r?\n') # Todo: unicode
+def get_position(buf, pos):
+        "Given a new offset, find the next position"
+        line = 1
+        line_off = 0
+        for match in newlines.finditer(buf, 0, pos):
+            line += 1;
+            line_off = match.end()
+
+        col = (pos-line_off)+1
+        return line, col
+
 class ParserErr(Exception):
 
     def name(self):
         return self.__class__.__name__
     def explain(self):
+        return self.reason
         return "{}:{}".format(self.name(), self.reason)
 
     def __init__(self, buf, pos, reason=None):
@@ -437,7 +450,7 @@ def parse_key(buf, pos, output, options):
         output.write(buf[pos:m.end()])
         pos = m.end()
         # ugh, hack
-        if buf[pos+1] not in (' ', '\r','\n'):
+        if buf[pos+1:pos+2] not in (' ', '\r','\n'):
             raise BadKey(buf, pos, "Expected space/newline after ':', got {}".format(repr(buf[pos:])))
         return name, pos, True
     else:
@@ -542,7 +555,8 @@ if __name__ == '__main__':
             parser.print_help()
             sys.exit(-1)
     except ParserErr as p:
-        print("{}:{}:{}".format(filename, p.pos, p.explain()), file=sys.stderr)
+        line, col = get_position(p.buf, p.pos)
+        print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
         sys.exit(-2)
 
     sys.exit(0)

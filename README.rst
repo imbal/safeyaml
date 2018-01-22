@@ -96,7 +96,8 @@ Here's an example of an error, which must be fixed manually::
   command: yes
 
   $ safeyaml fix input.yaml
-  input.yaml:10:ReservedKey:Can't use 'yes' as a value. Please either surround it in quotes if it's a string, or replace it with `true` if it's a boolean.
+  input.yaml:1:11:Can't use 'yes' as a value. Please either surround it in quotes
+  if it's a string, or replace it with `true` if it's a boolean.
 
 
 How do I generate it?
