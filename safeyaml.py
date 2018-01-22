@@ -21,7 +21,7 @@ string_sq = re.compile(
 
 identifier = re.compile(r"(?!\d)[\w\.]+")
 
-bareword = re.compile("(?:{}|{}|{}):".format(string_dq.pattern, string_sq.pattern, identifier.pattern))
+bareword = re.compile("(?:{}|{}|{})".format(string_dq.pattern, string_sq.pattern, identifier.pattern))
 
 str_escapes = {
     'b': '\b',
@@ -211,7 +211,7 @@ def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
 
             new_pos, new_indent, next_line = move_to_next(buf, pos)
             if next_line and new_indent <= my_indent:
-                raise IndentErr(buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
+                raise BadIndent(buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
 
             if not next_line:
                 output.write(buf[pos:new_pos])
