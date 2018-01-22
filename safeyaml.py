@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import re
 import io
+import re
 import sys
+import argparse
 
 from collections import OrderedDict
     
@@ -489,7 +490,34 @@ def parse_string(buf, pos, output, transform):
         out = transform(out)
     return out, end
 
+def process(input_fh, output_fh):
+    obj, output = parse(input_fh.read())
+    print(output, file=output_fh)
+    return obj
+
+
 if __name__ == '__main__':
-    fh = sys.stdin
-    obj, output = parse(fh.read())
-    print(output)
+    parser = argparse.ArgumentParser(description="SafeYAML Linter, checks (or formats) a YAML file for common ambiguities")
+
+    parser.add_argument("action", nargs=1, help="check or fix", default=None)
+    parser.add_argument("file", nargs="?", default=None, help="filename to read, without will read from stdin")
+
+    args = parser.parse_args() # will only return when action is given
+
+    action = args.action[0]
+
+    in_fh, out_fh = sys.stdin, sys.stdout
+
+    if args.file:
+        in_fh = open(args.file) # closed on exit
+
+    if action == 'check':
+        process(in_fh, out_fh)
+    elif action == 'fix':
+        raise Exception('unimplemented')
+    else:
+        parser.print_help()
+        sys.exit(-1)
+
+    sys.exit(0)
+
