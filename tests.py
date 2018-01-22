@@ -1,7 +1,8 @@
-import safeyaml
+import io
 import os
 import glob
 import yaml
+import safeyaml
 
 def smoke_tests():
     tests = {
@@ -34,9 +35,12 @@ def test_spec(test):
             print()
             print('X', test, "isn't valid vaml")
             return
-
+        
         try:
-            obj, output = safeyaml.parse(contents)
+            output = io.StringIO()
+            obj = safeyaml.parse(contents, output=output)
+            output = output.getvalue()
+
         except safeyaml.ParserErr as p:
             with open('{}.bad'.format(test)) as fh:
                 name, pos = fh.readline().split(':')
@@ -80,3 +84,4 @@ if __name__ == '__main__':
     for spec in glob.glob("tests/*.yaml"):
         test_spec(spec)
     print()
+
