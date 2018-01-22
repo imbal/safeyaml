@@ -21,7 +21,7 @@ It's best described as JSON plus the following:
 - You can use indentation for structure (braces are optional)
 - Keys can be unquoted (``foo: 1``, rather than ``"foo": 1``), or use ``''``'s too
 - Single-line comments with ``#``
-- Trailing commas allowed within ``[]`` or `{}``
+- Trailing commas allowed within ``[]`` or ``{}``
 
 Here's an example::
 
@@ -52,10 +52,10 @@ Here's an example::
 
 As for what's disallowed: a lot. String values must always be quoted. Boolean
 values must be written as ``true`` or ``false`` (``yes``, ``Y``, ``y``, ``on``
-etc are not allowed).
+etc are not allowed). Indented blocks must start on their own line.
 
 No anchors, no references. No multi-line strings. No multi-document streams. No
-custom tagged values. No Octal. *No sexagesimal numbers.*
+custom tagged values. No Octal, or Hexadecimal. *No sexagesimal numbers.*
 
 
 Why?
