@@ -22,7 +22,6 @@ string_sq = re.compile(
 identifier = re.compile(r"(?!\d)[\w\.]+")
 
 bareword = re.compile("(?:{}|{}|{}):".format(string_dq.pattern, string_sq.pattern, identifier.pattern))
-print(bareword.pattern)
 
 str_escapes = {
     'b': '\b',
@@ -116,7 +115,7 @@ def parse_structure(buf, pos, output, transform, indent=0):
                 raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
 
             new_pos, new_indent, next_line = move_to_next(buf, pos)
-            if next_line and new_indent < my_indent:
+            if next_line and new_indent <= my_indent:
                 raise ParserErr(buf, new_pos, "Unexpected dedent")
 
             if not next_line:
@@ -145,8 +144,9 @@ def parse_structure(buf, pos, output, transform, indent=0):
             if not m:
                 break
 
-
             name, pos = parse_key(buf, pos, output, transform)
+            if name in out:
+                raise ParserErr(buf,pos, 'duplicate key: {}, {}'.format(name, out))
 
             if buf[pos] != ':':
                 raise ParserErr(buf, pos, "Expected a ':' after a key".format(repr(buf[pos:])))
@@ -156,7 +156,7 @@ def parse_structure(buf, pos, output, transform, indent=0):
                 raise ParserErr(buf, pos, "Expected space/newline after ':'".format(repr(buf[pos:])))
 
             new_pos, new_indent, next_line = move_to_next(buf, pos)
-            if next_line and new_indent < my_indent:
+            if next_line and new_indent <= my_indent:
                 raise ParserErr(buf, new_pos, "Unexpected dedent")
 
             if not next_line:
@@ -209,12 +209,13 @@ def parse_object(buf, pos, output, transform=None):
         pos = skip_whitespace(buf, pos, output)
 
         while buf[pos] != '}':
-            key, pos = parse_key(buf, pos, output, transform)
+            
+            key, new_pos = parse_key(buf, pos, output, transform)
 
             if key in out:
-                raise SemanticErr('duplicate key: {}, {}'.format(key, out))
+                raise ParserErr(buf,pos, 'duplicate key: {}, {}'.format(key, out))
 
-            pos = skip_whitespace(buf, pos, output)
+            pos = skip_whitespace(buf, new_pos, output)
 
             peek = buf[pos]
 
