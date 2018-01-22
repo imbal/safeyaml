@@ -56,8 +56,9 @@ def get_position(buf, pos):
         return line, col
 
 class Options:
-    def __init__(self, allow_barewords=False):
+    def __init__(self, allow_barewords=False, allow_nodent=False):
         self.allow_barewords = allow_barewords
+        self.allow_nodent = allow_nodent
 
 class ParserErr(Exception):
     def name(self):
@@ -277,15 +278,21 @@ def parse_indented_map(buf, pos, output, options, my_indent, at_root):
         if buf[pos] not in (' ', '\r','\n'):
             raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(name),repr(buf[pos:])))
 
+        handled_nodent = False
+        
         new_pos, new_indent, next_line = move_to_next(buf, pos)
         if next_line and new_indent <= my_indent:
-            raise BadIndent(buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
+            if options.allow_nodent and new_indent == my_indent:
+                handled_nodent = True
+            else:
+                raise BadIndent(buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
 
         if not next_line:
             output.write(buf[pos:new_pos])
             obj, pos = parse_value(buf, new_pos, output, options)
         else:
             output.write(buf[pos:new_pos-new_indent])
+            if handled_nodent: output.write(' ')
             obj, pos = parse_structure(buf, new_pos-new_indent, output, options, indent=my_indent)
 
         # dupe check
@@ -558,6 +565,7 @@ if __name__ == '__main__':
 
     parser.add_argument("file", nargs="?", default=None, help="filename to read, without will read from stdin")
     parser.add_argument("--allow-barewords",  action='store_true', default=False, help="ask the parser to try its best to parse barewords")
+    parser.add_argument("--allow-nodent",  action='store_true', default=False, help="allow lists to nest inside maps with same indent")
     parser.add_argument("--quiet", action='store_true', default=False, help="don't print cleaned file")
     parser.add_argument("--json", action='store_true', default=False, help="output json instead of yaml")
 
@@ -567,7 +575,10 @@ if __name__ == '__main__':
     input_fh, output_fh = sys.stdin, sys.stdout
     filename = "<stdin>"
     
-    options = Options(allow_barewords=args.allow_barewords)
+    options = Options(
+            allow_barewords=args.allow_barewords,
+            allow_nodent=args.allow_nodent,
+    )
 
     if args.file:
         input_fh = open(args.file) # closed on exit
