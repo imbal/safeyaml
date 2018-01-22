@@ -114,6 +114,7 @@ def parse(buf, output=None, options=None):
 
     obj, pos = parse_structure(buf, pos, output, options, at_root=True)
 
+    start = pos
     m = whitespace.match(buf, pos)
     while m:
         pos = m.end()
@@ -121,6 +122,7 @@ def parse(buf, output=None, options=None):
         if m:
             pos = m.end()
             m = whitespace.match(buf, pos)
+    output.write(buf[start:pos])
 
     if pos != len(buf):
         raise TrailingContent(buf, pos, "Trailing content: {}".format(
