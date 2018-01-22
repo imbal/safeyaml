@@ -41,6 +41,10 @@ builtin_names = {'null': None, 'true': True, 'false': False}
 reserved_names = set("yes|no|on|off".split("|"))
 
 class ParserErr(Exception):
+
+    def explain(self):
+        return "{}:{}".format(self.__class__.__name__, self.reason)
+
     def __init__(self, buf, pos, reason=None):
         self.buf = buf
         self.pos = pos
@@ -528,7 +532,7 @@ if __name__ == '__main__':
             parser.print_help()
             sys.exit(-1)
     except ParserErr as p:
-        print("{}:{}:{}".format(filename, p.pos, p.reason), file=sys.stderr)
+        print("{}:{}:{}".format(filename, p.pos, p.explain()), file=sys.stderr)
         sys.exit(-2)
 
     sys.exit(0)

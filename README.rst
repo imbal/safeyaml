@@ -9,7 +9,7 @@ human-readable-and-writable configuration files, and nothing more.
 
 You don't need to integrate a new parser library: keep using your language's
 best-maintained YAML parser, and drop the ``safeyaml`` linter into your CI
-pipeline, pre-commit hook and/or text editor. It's a static binary, so you
+pipeline, pre-commit hook and/or text editor. It's a standalone script, so you
 don't have any new dependencies to worry about.
 
 
