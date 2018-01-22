@@ -89,8 +89,7 @@ with an error if it can't. Here's an example of a validate::
   $ safeyaml input.yaml
   title: "My YAML file"
 
-
-Here's an example of an error, which must be fixed manually::
+Here's an example of an error::
 
   $ cat input.yaml
   command: yes
@@ -108,6 +107,8 @@ Don't. That's not what YAML is for. Generate JSON if you need to serialize data.
 
 A Bigger Example
 ----------------
+
+Here's an example with errors, being fixed automatically::
 
   $ cat input.yaml 
   name: key
