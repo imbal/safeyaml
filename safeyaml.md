@@ -107,4 +107,7 @@ Like so:
 Barewords are allowed as the keys for objects, that match a identifier like pattern
 
 - Leading Character (non digit)
+
+In repair, keys still have to match identifiers, but values can have a string until end of line (assuming no special characters)
+
 - Then Alphanumeric, `_` and `.`
