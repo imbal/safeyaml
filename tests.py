@@ -34,7 +34,7 @@ def test_spec(test):
             print()
             print('X', test, "isn't valid vaml")
             return
-        
+
         try:
             obj, output = safeyaml.parse(contents)
         except safeyaml.ParserErr as p:
@@ -77,7 +77,6 @@ def test_spec(test):
 
 if __name__ == '__main__':
     smoke_tests()
-    for spec in glob.glob("test/*.yaml"):
+    for spec in glob.glob("tests/*.yaml"):
         test_spec(spec)
     print()
-
