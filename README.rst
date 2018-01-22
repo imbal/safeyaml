@@ -117,7 +117,7 @@ Here's an example with errors, being fixed automatically::
   yes:
   - no
   
-  $ ./safeyaml input.yaml --allow-barewords --allow-nospace --allow-nodent --force-strings
+  $ ./safeyaml input.yaml --fix-barewords --fix-nospace --fix-nodent --force-strings
   "name": "key"
   "setting": {"a": 1,"b": 2}
   "off": "on"

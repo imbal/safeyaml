@@ -56,10 +56,10 @@ def get_position(buf, pos):
         return line, col
 
 class Options:
-    def __init__(self, allow_barewords=False, allow_nodent=False, allow_nospace=False, force_strings=False, force_commas=False):
-        self.allow_barewords = allow_barewords
-        self.allow_nodent = allow_nodent
-        self.allow_nospace = allow_nospace
+    def __init__(self, fix_barewords=False, fix_nodent=False, fix_nospace=False, force_strings=False, force_commas=False):
+        self.fix_barewords = fix_barewords
+        self.fix_nodent = fix_nodent
+        self.fix_nospace = fix_nospace
         self.force_strings = force_strings
         self.force_commas = force_commas
 
@@ -279,7 +279,7 @@ def parse_indented_map(buf, pos, output, options, my_indent, at_root):
         output.write(":")
         pos +=1
         if buf[pos] not in (' ', '\r','\n'):
-            if options.allow_nospace:
+            if options.fix_nospace:
                 output.write(' ')
             else:
                 raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(name),repr(buf[pos:])))
@@ -288,7 +288,7 @@ def parse_indented_map(buf, pos, output, options, my_indent, at_root):
         
         new_pos, new_indent, next_line = move_to_next(buf, pos)
         if next_line and new_indent <= my_indent:
-            if options.allow_nodent and new_indent == my_indent:
+            if options.fix_nodent and new_indent == my_indent:
                 handled_nodent = True
             else:
                 raise BadIndent(buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
@@ -369,7 +369,7 @@ def parse_map(buf, pos, output, options):
             raise BadKey( buf, pos, "Expected a ':', when parsing a key: value pair but found {}".format(repr(peek)))
 
         if is_bare and buf[pos] not in (' ', '\r','\n'):
-            if options.allow_nospace:
+            if options.fix_nospace:
                 output.write(' ')
             else:
                 raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(key),repr(buf[pos:])))
@@ -406,12 +406,12 @@ def parse_key(buf, pos, output, options):
         name = item.lower()
 
         if name in builtin_names:
-            if options.allow_barewords:
+            if options.fix_barewords:
                 item = '"{}"'.format(item)
             else:
                 raise BadKey(buf, pos,"Found '{}' as a bareword key, Please use quotes around it.".format(item))
         elif name in reserved_names:
-            if options.allow_barewords:
+            if options.fix_barewords:
                 item = '"{}"'.format(item)
             else:
                 raise ReservedKey(buf, pos,"Found '{}' as a bareword key, which can be parsed as a boolean. Please use quotes around it.".format(item))
@@ -572,14 +572,14 @@ def parse_bareword(buf, pos, output, options):
             out = builtin_names[name]
             output.write(name)
             return out, m.end()
-        elif options.allow_barewords:
+        elif options.fix_barewords:
             pass
         elif item.lower() in reserved_names:
             raise ReservedKey(buf, pos,"Can't use '{}' as a value. Please either surround it in quotes if it\'s a string, or replace it with `true` if it\'s a boolean.".format(item))
         else:
             raise Bareword(buf, pos, "{} doesn't look like 'true', 'false', or 'null', who are you kidding ".format(repr(item)))
 
-    if options.allow_barewords:
+    if options.fix_barewords:
         m = barewords.match(buf, pos)
         if m:
             end = m.end()
@@ -598,9 +598,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="SafeYAML Linter, checks (or formats) a YAML file for common ambiguities")
 
     parser.add_argument("file", nargs="?", default=None, help="filename to read, without will read from stdin")
-    parser.add_argument("--allow-barewords",  action='store_true', default=False, help="ask the parser to try its best to parse barewords")
-    parser.add_argument("--allow-nodent",  action='store_true', default=False, help="allow lists to nest inside maps with same indent")
-    parser.add_argument("--allow-nospace",  action='store_true', default=False, help="allow map keys not to have ' ' after a ':'")
+    parser.add_argument("--fix",  action='store_true', default=False, help="ask the parser to hog wild")
+    parser.add_argument("--fix-barewords",  action='store_true', default=False, help="ask the parser to try its best to parse barewords")
+    parser.add_argument("--fix-nodent",  action='store_true', default=False, help="fix lists to nest inside maps with same indent")
+    parser.add_argument("--fix-nospace",  action='store_true', default=False, help="fix map keys not to have ' ' after a ':'")
     parser.add_argument("--force-strings",  action='store_true', default=False, help="quote every bareword")
     parser.add_argument("--force-commas",  action='store_true', default=False, help="trailing commas")
     parser.add_argument("--quiet", action='store_true', default=False, help="don't print cleaned file")
@@ -613,9 +614,9 @@ if __name__ == '__main__':
     filename = "<stdin>"
     
     options = Options(
-            allow_barewords=args.allow_barewords,
-            allow_nodent=args.allow_nodent,
-            allow_nospace=args.allow_nospace,
+            fix_barewords=args.fix_barewords or args.fix,
+            fix_nodent=args.fix_nodent or args.fix,
+            fix_nospace=args.fix_nospace or args.fix,
             force_strings=args.force_strings,
             force_commas=args.force_commas,
     )
