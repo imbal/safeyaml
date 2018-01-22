@@ -23,6 +23,9 @@ string_sq = re.compile(
 
 identifier = re.compile(r"(?!\d)[\w\.]+")
 
+bareword = re.compile("(?:{}|{}|{}):".format(string_dq.pattern, string_sq.pattern, identifier.pattern))
+print(bareword.pattern)
+
 str_escapes = {
     'b': '\b',
     'n': '\n',
@@ -135,18 +138,23 @@ def parse_structure(buf, pos, output, transform, indent=0):
                 pos = new_pos
                     
         return out, pos
-    m = identifier.match(buf, pos)
-    if m:
+    m = bareword.match(buf, pos)
+
+    if peek == '"' or peek == '"' or m:
         out = OrderedDict()
 
         while pos < len(buf):
-            m = identifier.match(buf, pos)
+            m = bareword.match(buf, pos)
             if not m:
                 break
-            else:
+
+            m = identifier.match(buf, pos)
+            if m:
                 name = buf[pos:m.end()]
                 output.write(buf[pos:m.end()])
                 pos = m.end()
+            else:
+                name, pos = parse_string(buf, pos, output, transform)
 
             if buf[pos] != ':':
                 raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
@@ -165,6 +173,7 @@ def parse_structure(buf, pos, output, transform, indent=0):
             else:
                 obj, pos = parse_structure(buf, pos, output, transform, indent=my_indent)
 
+            # dupe check
             out[name] = obj
 
             new_pos, new_indent, next_line = move_to_next(buf, pos)
@@ -225,6 +234,7 @@ def parse_object(buf, pos, output, transform=None):
 
             item, pos = parse_object(buf, pos, output, transform)
 
+            # dupe check
             out[key] = item
 
             pos = skip_whitespace(buf, pos, output)
@@ -273,71 +283,7 @@ def parse_object(buf, pos, output, transform=None):
         return out, pos
 
     elif peek == "'" or peek == '"':
-        s = io.StringIO()
-
-        # validate string
-        if peek == "'":
-            m = string_sq.match(buf, pos)
-            if m:
-                end = m.end()
-                output.write(buf[pos:end])
-            else:
-                raise ParserErr(buf, pos, "Invalid single quoted string")
-        else:
-            m = string_dq.match(buf, pos)
-            if m:
-                end = m.end()
-                output.write(buf[pos:end])
-            else:
-                raise ParserErr(buf, pos, "Invalid double quoted string")
-
-        lo = pos + 1  # skip quotes
-        while lo < end - 1:
-            hi = buf.find("\\", lo, end)
-            if hi == -1:
-                s.write(buf[lo:end - 1])  # skip quote
-                break
-
-            s.write(buf[lo:hi])
-
-            esc = buf[hi + 1]
-            if esc in str_escapes:
-                s.write(str_escapes[esc])
-                lo = hi + 2
-            elif esc == 'x':
-                n = int(buf[hi + 2:hi + 4], 16)
-                s.write(chr(n))
-                lo = hi + 4
-            elif esc == 'u':
-                n = int(buf[hi + 2:hi + 6], 16)
-                if 0xD800 <= n <= 0xDFFF:
-                    raise ParserErr(
-                        buf, hi, 'string cannot have surrogate pairs')
-                s.write(chr(n))
-                lo = hi + 6
-            elif esc == 'U':
-                n = int(buf[hi + 2:hi + 10], 16)
-                if 0xD800 <= n <= 0xDFFF:
-                    raise ParserErr(
-                        buf, hi, 'string cannot have surrogate pairs')
-                s.write(chr(n))
-                lo = hi + 10
-            elif esc == '\n':
-                lo = hi + 2
-            elif (buf[hi + 1:hi + 3] == '\r\n'):
-                lo = hi + 3
-            else:
-                raise ParserErr(
-                    buf, hi, "Unkown escape character {}".format(repr(esc)))
-
-        out = s.getvalue()
-
-        # XXX output.write string.escape
-
-        if transform is not None:
-            out = transform(out)
-        return out, end
-
+        return parse_string(buf, pos, output, transform)
     elif peek in "-+0123456789":
 
         flt_end = None
@@ -405,6 +351,72 @@ def parse_object(buf, pos, output, transform=None):
 
     raise ParserErr(buf, pos)
 
+def parse_string(buf, pos, output, transform):
+    s = io.StringIO()
+    peek = buf[pos]
+
+    # validate string
+    if peek == "'":
+        m = string_sq.match(buf, pos)
+        if m:
+            end = m.end()
+            output.write(buf[pos:end])
+        else:
+            raise ParserErr(buf, pos, "Invalid single quoted string")
+    else:
+        m = string_dq.match(buf, pos)
+        if m:
+            end = m.end()
+            output.write(buf[pos:end])
+        else:
+            raise ParserErr(buf, pos, "Invalid double quoted string")
+
+    lo = pos + 1  # skip quotes
+    while lo < end - 1:
+        hi = buf.find("\\", lo, end)
+        if hi == -1:
+            s.write(buf[lo:end - 1])  # skip quote
+            break
+
+        s.write(buf[lo:hi])
+
+        esc = buf[hi + 1]
+        if esc in str_escapes:
+            s.write(str_escapes[esc])
+            lo = hi + 2
+        elif esc == 'x':
+            n = int(buf[hi + 2:hi + 4], 16)
+            s.write(chr(n))
+            lo = hi + 4
+        elif esc == 'u':
+            n = int(buf[hi + 2:hi + 6], 16)
+            if 0xD800 <= n <= 0xDFFF:
+                raise ParserErr(
+                    buf, hi, 'string cannot have surrogate pairs')
+            s.write(chr(n))
+            lo = hi + 6
+        elif esc == 'U':
+            n = int(buf[hi + 2:hi + 10], 16)
+            if 0xD800 <= n <= 0xDFFF:
+                raise ParserErr(
+                    buf, hi, 'string cannot have surrogate pairs')
+            s.write(chr(n))
+            lo = hi + 10
+        elif esc == '\n':
+            lo = hi + 2
+        elif (buf[hi + 1:hi + 3] == '\r\n'):
+            lo = hi + 3
+        else:
+            raise ParserErr(
+                buf, hi, "Unkown escape character {}".format(repr(esc)))
+
+    out = s.getvalue()
+
+    # XXX output.write string.escape
+
+    if transform is not None:
+        out = transform(out)
+    return out, end
 
 if __name__ == '__main__':
     tests = """
