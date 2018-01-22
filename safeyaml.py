@@ -52,12 +52,59 @@ class ParserErr(Exception):
         Exception.__init__(self, "{} (at pos={})".format(reason, pos))
 
 
+class SemanticErr(ParserErr):
+    pass
+
+class DuplicateKey(SemanticErr):
+    pass
+
+class ReservedKey(SemanticErr):
+    pass
+
+
+class SyntaxErr(ParserErr):
+    pass
+
+class BadIndent(SyntaxErr):
+    pass
+
+class BadKey(SyntaxErr):
+    pass
+
+class Bareword(ParserErr):
+    pass
+
+class BadString(SyntaxErr):
+    pass
+
+class BadNumber(SyntaxErr):
+    pass
+
+class NoRootObject(SyntaxErr):
+    pass
+
+class ObjectIndentationErr(SyntaxErr):
+    pass
+
+class TrailingContent(SyntaxErr):
+    pass
+
+
+class UnsupportedYAML(ParserErr):
+    pass
+
+class UnsupportedEscape(ParserErr):
+    pass
+
 
 def parse(buf, transform=None):
+    if not buf:
+        raise NoRootDocument(buf, pos, "Empty Document")
+
     pos = 1 if buf.startswith("\uFEFF") else 0
 
     output = io.StringIO()
-    obj, pos = parse_structure(buf, pos, output, transform)
+    obj, pos = parse_structure(buf, pos, output, transform, at_root=True)
 
     m = whitespace.match(buf, pos)
     while m:
@@ -68,7 +115,7 @@ def parse(buf, transform=None):
             m = whitespace.match(buf, pos)
 
     if pos != len(buf):
-        raise ParserErr(buf, pos, "Trailing content: {}".format(
+        raise TrailingContent(buf, pos, "Trailing content: {}".format(
             repr(buf[pos:pos + 10])))
 
     return obj, output.getvalue()
@@ -89,19 +136,20 @@ def move_to_next(buf, pos):
             next_line = True
             while pos < len(buf):
                 pos +=1
-                if buf[pos] == '\n':
+                if buf[pos] == '\r' or buf[pos] == '\n':
                     line_pos = pos
+                    next_line = True
                     break 
         else:
             break
     return pos, pos-line_pos, next_line
 
-def parse_structure(buf, pos, output, transform, indent=0):
+def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
     start = pos
     pos, my_indent, next_line = move_to_next(buf, pos)
 
     if my_indent < indent:
-        raise ParserErr(buf, pos, "Unexpected dedent")
+        raise BadIndent(buf, pos, "The parser has gotten terribly confused, I'm sorry. Try re-indenting")
 
     output.write(buf[start:pos])
     peek = buf[pos]
@@ -114,11 +162,11 @@ def parse_structure(buf, pos, output, transform, indent=0):
             output.write("-")
             pos +=1
             if buf[pos] not in (' ', '\r','\n'):
-                raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
+                raise BadKey(buf, pos, "For indented lists i.e '- foo', the '-'  must be followed by ' ', or '\n', not: {}".format(buf[pos-1:pos+1]))
 
             new_pos, new_indent, next_line = move_to_next(buf, pos)
             if next_line and new_indent <= my_indent:
-                raise ParserErr(buf, new_pos, "Unexpected dedent")
+                raise BadIndent(buf, new_pos, "Expecting a list item, but the next line isn't indented enough")
 
             if not next_line:
                 output.write(buf[pos:new_pos])
@@ -146,20 +194,24 @@ def parse_structure(buf, pos, output, transform, indent=0):
             if not m:
                 break
 
-            name, pos = parse_key(buf, pos, output, transform)
+            name, pos, is_bare = parse_key(buf, pos, output, transform)
             if name in out:
-                raise ParserErr(buf,pos, 'duplicate key: {}, {}'.format(name, out))
+                raise DuplicateKey(buf,pos, "Can't have duplicate keys: {} is defined twice.".format(repr(name)))
 
             if buf[pos] != ':':
-                raise ParserErr(buf, pos, "Expected a ':' after a key".format(repr(buf[pos:])))
+                if is_bare or not at_root:
+                    raise BadKey(buf, pos, "Expected 'key:', but didn't find a ':', found {}".format(repr(buf[pos:])))
+                else:
+                    raise NoRootObject(buf, pos, "Expected 'key:', but didn't find a ':', found a string {}. Note that strings must be inside a containing object or list, and cannot be root element".format(repr(buf[pos:])))
+
             output.write(":")
             pos +=1
             if buf[pos] not in (' ', '\r','\n'):
-                raise ParserErr(buf, pos, "Expected space/newline after ':'".format(repr(buf[pos:])))
+                raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(name),repr(buf[pos:])))
 
             new_pos, new_indent, next_line = move_to_next(buf, pos)
             if next_line and new_indent <= my_indent:
-                raise ParserErr(buf, new_pos, "Unexpected dedent")
+                raise IndentErr(buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
 
             if not next_line:
                 output.write(buf[pos:new_pos])
@@ -183,7 +235,13 @@ def parse_structure(buf, pos, output, transform, indent=0):
     if peek == '{' or peek == '[':
         return parse_object(buf, pos, output, transform)
 
-    raise ParserErr(buf, pos, "No root object found: expected object or list")
+    if peek in "+-0123456789":
+        if at_root:
+            raise NoRootObject(buf, pos, "No root object found: expected object or list, found start of number")
+        else:
+            raise BadIndent(buf, pos, "Expected an indented object or indented list, but found start of number on next line.")
+
+    raise SyntaxErr(buf, pos, "The parser has become terribly confused, I'm sorry")
 
 def skip_whitespace(buf, pos, output):
     m = whitespace.match(buf, pos)
@@ -212,10 +270,10 @@ def parse_object(buf, pos, output, transform=None):
 
         while buf[pos] != '}':
             
-            key, new_pos = parse_key(buf, pos, output, transform)
+            key, new_pos, is_bare = parse_key(buf, pos, output, transform)
 
             if key in out:
-                raise ParserErr(buf,pos, 'duplicate key: {}, {}'.format(key, out))
+                raise DuplicateKey(buf,pos, 'duplicate key: {}, {}'.format(key, out))
 
             pos = skip_whitespace(buf, new_pos, output)
 
@@ -228,8 +286,7 @@ def parse_object(buf, pos, output, transform=None):
                 pos += 1
                 pos = skip_whitespace(buf, pos, output)
             else:
-                raise ParserErr(
-                    buf, pos, "Expected key:value pair but found {}".format(repr(peek)))
+                raise BadKey( buf, pos, "Expected a ':', when parsing a key: value pair but found {}".format(repr(peek)))
 
             item, pos = parse_object(buf, pos, output, transform)
 
@@ -244,8 +301,7 @@ def parse_object(buf, pos, output, transform=None):
                 output.write(',')
                 pos = skip_whitespace(buf, pos, output)
             elif peek != '}':
-                raise ParserErr(
-                    buf, pos, "Expecting a ',', or a '{}' but found {}".format('}',repr(peek)))
+                raise SyntaxErr(buf, pos, "Expecting a ',', or a '{}' but found {}".format('}',repr(peek)))
 
         output.write('}')
         if transform is not None:
@@ -272,8 +328,7 @@ def parse_object(buf, pos, output, transform=None):
                 pos += 1
                 pos = skip_whitespace(buf, pos, output)
             elif peek != ']':
-                raise ParserErr(
-                    buf, pos, "Expecting a ',', or a ']' but found {}".format(repr(peek)))
+                raise SyntaxErr( buf, pos, "Inside a [], Expecting a ',', or a ']' but found {}".format(repr(peek)))
 
         output.write("]")
         pos += 1
@@ -305,7 +360,7 @@ def parse_object(buf, pos, output, transform=None):
             int_end = m.end()
             end = int_end
         else:
-            raise ParserErr(buf, pos, "Invalid number")
+            raise BadNumber(buf, pos, "Invalid number")
 
         t = flt_b10.match(buf, end)
         if t:
@@ -322,7 +377,7 @@ def parse_object(buf, pos, output, transform=None):
         else:
             out = sign * int(buf[pos:end])
             if leading_zero and out != 0:
-                raise Exception('Nope')
+                raise BadNumber(buf, pos, "Can't have leading zeros on non-zero integers")
 
         output.write(buf[start:end])
 
@@ -336,12 +391,12 @@ def parse_object(buf, pos, output, transform=None):
             end = m.end()
             item = buf[pos:end]
         else:
-            raise ParserErr(buf, pos)
+            # it's a bareword
+            raise Bareword(buf, pos, "The parser doesn't know how to parse anymore and has given up. Use less barewords")
 
 
         if item.lower() not in builtin_names:
-            raise ParserErr(
-                buf, pos, "{} is not a recognised built-in".format(repr(item)))
+            raise Bareword(buf, pos, "{} doesn't look like 'true', 'false', or 'null', who are you kidding ".format(repr(item)))
 
         item = item.lower()
         out = builtin_names[item]
@@ -351,7 +406,7 @@ def parse_object(buf, pos, output, transform=None):
             out = transform(out)
         return out, end
 
-    raise ParserErr(buf, pos)
+    raise ParserErr(buf, pos, "Bug in parser, sorry")
 
 
 def parse_key(buf, pos, output, transform):
@@ -359,16 +414,17 @@ def parse_key(buf, pos, output, transform):
     if m:
         name = buf[pos:m.end()]
         if name.lower() in reserved_names:
-            raise ParserErr(buf, pos,"Can't use {} as a bareword key".format(name))
+            raise ReservedKey(buf, pos,"Can't use {} as a bareword key".format(name))
 
         output.write(buf[pos:m.end()])
         pos = m.end()
         # ugh, hack
         if buf[pos+1] not in (' ', '\r','\n'):
-            raise ParserErr(buf, pos, "Expected space/newline after ':', got {}".format(repr(buf[pos:])))
+            raise BadKey(buf, pos, "Expected space/newline after ':', got {}".format(repr(buf[pos:])))
+        return name, pos, True
     else:
         name, pos = parse_string(buf, pos, output, transform)
-    return name, pos
+        return name, pos, False
 
 def parse_string(buf, pos, output, transform):
     s = io.StringIO()
@@ -381,14 +437,14 @@ def parse_string(buf, pos, output, transform):
             end = m.end()
             output.write(buf[pos:end])
         else:
-            raise ParserErr(buf, pos, "Invalid single quoted string")
+            raise BadString(buf, pos, "Invalid single quoted string")
     else:
         m = string_dq.match(buf, pos)
         if m:
             end = m.end()
             output.write(buf[pos:end])
         else:
-            raise ParserErr(buf, pos, "Invalid double quoted string")
+            raise BadString(buf, pos, "Invalid double quoted string")
 
     lo = pos + 1  # skip quotes
     while lo < end - 1:
@@ -410,24 +466,19 @@ def parse_string(buf, pos, output, transform):
         elif esc == 'u':
             n = int(buf[hi + 2:hi + 6], 16)
             if 0xD800 <= n <= 0xDFFF:
-                raise ParserErr(
+                raise BadString(
                     buf, hi, 'string cannot have surrogate pairs')
             s.write(chr(n))
             lo = hi + 6
         elif esc == 'U':
             n = int(buf[hi + 2:hi + 10], 16)
             if 0xD800 <= n <= 0xDFFF:
-                raise ParserErr(
+                raise BadString(
                     buf, hi, 'string cannot have surrogate pairs')
             s.write(chr(n))
             lo = hi + 10
-        # elif esc == '\n':
-        #     lo = hi + 2
-        #     while hi <  
-        elif (buf[hi + 1:hi + 3] == '\r\n'):
-            lo = hi + 3
         else:
-            raise ParserErr(
+            raise UnsupportedEscape(
                 buf, hi, "Unkown escape character {}".format(repr(esc)))
 
     out = s.getvalue()
