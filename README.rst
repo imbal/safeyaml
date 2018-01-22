@@ -104,9 +104,8 @@ How do I generate it?
 
 Don't. That's not what YAML is for. Generate JSON if you need to serialize data.
 
-
-A Bigger Example
-----------------
+Repairing YAML
+--------------
 
 Here's an example with errors, being fixed automatically::
 
@@ -124,4 +123,23 @@ Here's an example with errors, being fixed automatically::
   "yes":
    - "no"
 
+``--fix-barewords`` enables two things. Bareword keys must still be in identifier format (a1.b2.c2 etc), but it replaces any reserved name ('true' etc) with the string ``"true"``. For values, it allows barewords until the end of line when inside an indented map.
 
+``--fix-nospace`` ensures that all keys are followed by ``: ``.
+
+``--fix-nodent`` allows list items to be inside of maps without additional indentation. 
+
+``--fix`` enables all ``--fix-*`` options
+
+``--force-strings`` turns every bareword into a string.
+
+``--force-commas`` ensures every non-empty list or map has a trailing comma.
+
+Other Arguments
+---------------
+
+``--json`` output JSON instead of YAML.
+
+``--quiet`` don't output YAML on success.
+
+``--in-place`` if fixes/parsing successful, write changes back in-place.
