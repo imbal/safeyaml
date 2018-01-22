@@ -149,11 +149,11 @@ def parse_structure(buf, pos, output, transform, indent=0):
             name, pos = parse_key(buf, pos, output, transform)
 
             if buf[pos] != ':':
-                raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
+                raise ParserErr(buf, pos, "Expected a ':' after a key".format(repr(buf[pos:])))
             output.write(":")
             pos +=1
             if buf[pos] not in (' ', '\r','\n'):
-                raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
+                raise ParserErr(buf, pos, "Expected space/newline after ':'".format(repr(buf[pos:])))
 
             new_pos, new_indent, next_line = move_to_next(buf, pos)
             if next_line and new_indent < my_indent:
@@ -177,8 +177,11 @@ def parse_structure(buf, pos, output, transform, indent=0):
                 pos = new_pos
                     
         return out, pos
-        return out, pos
-    return parse_object(buf, pos, output, transform)
+
+    if peek == '{' or peek == '[':
+        return parse_object(buf, pos, output, transform)
+
+    raise ParserErr(buf, pos, "No root object found: expected object or list")
 
 def skip_whitespace(buf, pos, output):
     m = whitespace.match(buf, pos)
@@ -352,6 +355,9 @@ def parse_key(buf, pos, output, transform):
         name = buf[pos:m.end()]
         output.write(buf[pos:m.end()])
         pos = m.end()
+        # ugh, hack
+        if buf[pos+1] not in (' ', '\r','\n'):
+            raise ParserErr(buf, pos, "Expected space/newline after ':', got {}".format(repr(buf[pos:])))
     else:
         name, pos = parse_string(buf, pos, output, transform)
     return name, pos

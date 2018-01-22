@@ -78,6 +78,7 @@ a:
 
 ## lint errors
 
+- bareword keys without trailing space
 - tabs in indentation
 - allowed root objects
 - missing values in dict
