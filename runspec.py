@@ -3,44 +3,80 @@ import os
 import glob
 import yaml
 
-if __name__ != '__main__':
-    raise Exception('no')
-tests = """
-    [0]
-    [1.2]
-    [-3.4]
-    [+5.6]
-    ["test"]
-    ['test']
-    [1,2,3]
-    [1,2,3,]
-    {"a":1}
-    {'b':2,}
-    [1 ] #foo """
-for test in tests.split("\n"):
-    test.strip()
-    if not test: continue
-    print(repr(test))
-    print('=>', safeyaml.parse(test)[0])
+def smoke_tests():
+    tests = {
+        """ [0] """:            0,
+        """ [1.2] """:           1.2,
+        """ [-3.4] """:         -3.4,
+        """ [+5.6] """:         +5.6,
+        """ "test": 1 """:      {'test':1},
+        """ n: 'test' """:      {'n':'test'},
+        """ [1 ,2,3] """:       [1,2,3],
+        """ [1,2,3,] """:       [1,2,3],
+        """ {"a":1} """:        {'a':1},
+        """ {'b':2,} """:     {'b':2},
+        """ [1  #foo\n] """:    [1],
+    }
+    for test in tests:
+        try:
+            out = safeyaml.parse(test)
+            print('.', end='', flush=True)
+        except safeyaml.ParserErr as p:
+            print()
+            print('X',repr(test),"gave",p.name())
 
-for test in glob.glob("spec/*.yaml"):
-    print()
-    print()
+def test_spec(test):
     with open(test) as fh:
         contents = fh.read()
-
-        expected = yaml.load(contents)
+        try:
+            ref_obj = yaml.load(contents)
+        except:
+            print()
+            print('X', test, "isn't valid vaml")
+            return
         
-        obj, output = safeyaml.parse(contents)
-        print("---")
-        for line in zip(contents.split('\n'),output.split('\n')):
-            print(">", line[0],'$')
-            print("<", line[1], '$')
-            if line[0] != line[1]:
-                raise('butt')
-        print("---")
-        expected_out = yaml.load(output)
+        try:
+            obj, output = safeyaml.parse(contents)
+        except safeyaml.ParserErr as p:
+            with open('{}.bad'.format(test)) as fh:
+                name, pos = fh.readline().split(':')
+            if p.name() == name and p.pos == pos:
+                print('.', end='', flush=True)
+                return
+            else:
+                print()
+                print('X',test, "failed, expecting {}:{} got {}:{}".format(name,pos, p.name(), p.pos))
+                return
 
-        if expected != expected_out:
-            raise Exception('no')
+        if obj != ref_obj:
+            print()
+            print('X', test, 'failed, safeyaml parsed different object from reference parser')
+
+        try:
+            parsed_output = yaml.load(output)
+        except Exception as e:
+            print()
+            print('X', test, 'failed, producing invalid YAML as output')
+            return
+
+        if parsed_output != ref_obj:
+            print()
+            print('X', test, 'failed, parsed safeyaml output is different from reference parse of input')
+            return
+
+        with open('{}.ok'.format(test)) as fh:
+            expected_output = fh.read()
+
+        if expected_output != output:
+            print()
+            print('X', test, 'failed. output and {}.ok do not match'.format(test))
+            return
+
+        print('.',end='', flush=True)
+
+if __name__ == '__main__':
+    smoke_tests()
+    for spec in glob.glob("spec/*.yaml"):
+        test_spec(spec)
+    print()
 

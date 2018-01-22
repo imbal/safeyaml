@@ -1,0 +1,24 @@
+title: "SafeYAML Example"
+
+database:
+  server: "192.168.1.1"
+
+  # JSON-style arrays
+  ports: [
+    8000,
+    8001,
+    8002,
+  ]
+
+  enabled: true
+
+servers:
+  # JSON-style objects
+  alpha: {
+    "ip": "10.0.0.1",
+    "dc": "eqdc10",
+  }
+  beta: {
+    "ip": "10.0.0.2",
+    "dc": "eqdc10",
+  }

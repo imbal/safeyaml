@@ -1,0 +1,8 @@
+name: "value"
+foo: 123.45
+nested:
+   "keys": 1
+   "nice": 2
+"feels":
+    pretty: "good"
+    what: {a.b: 123, c.d: 456}

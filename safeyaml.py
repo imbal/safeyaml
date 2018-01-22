@@ -42,8 +42,10 @@ reserved_names = set("yes|no|on|off".split("|"))
 
 class ParserErr(Exception):
 
+    def name(self):
+        return self.__class__.__name__
     def explain(self):
-        return "{}:{}".format(self.__class__.__name__, self.reason)
+        return "{}:{}".format(self.name(), self.reason)
 
     def __init__(self, buf, pos, reason=None):
         self.buf = buf
@@ -102,14 +104,14 @@ class UnsupportedEscape(ParserErr):
     pass
 
 
-def parse(buf, transform=None):
+def parse(buf, options=None):
     if not buf:
         raise NoRootDocument(buf, pos, "Empty Document")
 
     pos = 1 if buf.startswith("\uFEFF") else 0
 
     output = io.StringIO()
-    obj, pos = parse_structure(buf, pos, output, transform, at_root=True)
+    obj, pos = parse_structure(buf, pos, output, options, at_root=True)
 
     m = whitespace.match(buf, pos)
     while m:
@@ -149,7 +151,7 @@ def move_to_next(buf, pos):
             break
     return pos, pos-line_pos, next_line
 
-def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
+def parse_structure(buf, pos, output, options, indent=0, at_root=False):
     start = pos
     pos, my_indent, next_line = move_to_next(buf, pos)
 
@@ -159,7 +161,7 @@ def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
     output.write(buf[start:pos])
     peek = buf[pos]
 
-    if peek in ('*', '&', '?', '|', '<', '>', '%',):
+    if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
         raise UnsupportedYAML(buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
 
     if peek == '-' and buf[pos:pos+3] == '---':
@@ -181,9 +183,9 @@ def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
 
             if not next_line:
                 output.write(buf[pos:new_pos])
-                obj, pos = parse_object(buf, new_pos, output, transform)
+                obj, pos = parse_object(buf, new_pos, output, options)
             else:
-                obj, pos = parse_structure(buf, pos, output, transform, indent=my_indent)
+                obj, pos = parse_structure(buf, pos, output, options, indent=my_indent)
 
             out.append(obj)
 
@@ -205,7 +207,7 @@ def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
             if not m:
                 break
 
-            name, pos, is_bare = parse_key(buf, pos, output, transform)
+            name, pos, is_bare = parse_key(buf, pos, output, options)
             if name in out:
                 raise DuplicateKey(buf,pos, "Can't have duplicate keys: {} is defined twice.".format(repr(name)))
 
@@ -226,10 +228,10 @@ def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
 
             if not next_line:
                 output.write(buf[pos:new_pos])
-                obj, pos = parse_object(buf, new_pos, output, transform)
+                obj, pos = parse_object(buf, new_pos, output, options)
             else:
                 output.write(buf[pos:new_pos-new_indent])
-                obj, pos = parse_structure(buf, new_pos-new_indent, output, transform, indent=my_indent)
+                obj, pos = parse_structure(buf, new_pos-new_indent, output, options, indent=my_indent)
 
             # dupe check
             out[name] = obj
@@ -244,7 +246,7 @@ def parse_structure(buf, pos, output, transform, indent=0, at_root=False):
         return out, pos
 
     if peek == '{' or peek == '[':
-        return parse_object(buf, pos, output, transform)
+        return parse_object(buf, pos, output, options)
 
     if peek in "+-0123456789":
         if at_root:
@@ -267,10 +269,17 @@ def skip_whitespace(buf, pos, output):
     return pos
 
 
-def parse_object(buf, pos, output, transform=None):
+def parse_object(buf, pos, output, options=None):
     pos = skip_whitespace(buf, pos, output)
 
     peek = buf[pos]
+
+    if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
+        raise UnsupportedYAML(buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
+
+    if peek == '-' and buf[pos:pos+3] == '---':
+        raise UnsupportedYAML(buf, pos, "A SafeYAML document is a single document, '---' separators are unsupported")
+    
 
     if peek == '{':
         output.write('{')
@@ -281,7 +290,7 @@ def parse_object(buf, pos, output, transform=None):
 
         while buf[pos] != '}':
             
-            key, new_pos, is_bare = parse_key(buf, pos, output, transform)
+            key, new_pos, is_bare = parse_key(buf, pos, output, options)
 
             if key in out:
                 raise DuplicateKey(buf,pos, 'duplicate key: {}, {}'.format(key, out))
@@ -299,7 +308,7 @@ def parse_object(buf, pos, output, transform=None):
             else:
                 raise BadKey( buf, pos, "Expected a ':', when parsing a key: value pair but found {}".format(repr(peek)))
 
-            item, pos = parse_object(buf, pos, output, transform)
+            item, pos = parse_object(buf, pos, output, options)
 
             # dupe check
             out[key] = item
@@ -315,8 +324,6 @@ def parse_object(buf, pos, output, transform=None):
                 raise SyntaxErr(buf, pos, "Expecting a ',', or a '{}' but found {}".format('}',repr(peek)))
 
         output.write('}')
-        if transform is not None:
-            out = transform(out)
         return out, pos + 1
 
     elif peek == '[':
@@ -328,7 +335,7 @@ def parse_object(buf, pos, output, transform=None):
         pos = skip_whitespace(buf, pos, output)
 
         while buf[pos] != ']':
-            item, pos = parse_object(buf, pos, output, transform)
+            item, pos = parse_object(buf, pos, output, options)
             out.append(item)
 
             pos = skip_whitespace(buf, pos, output)
@@ -344,12 +351,10 @@ def parse_object(buf, pos, output, transform=None):
         output.write("]")
         pos += 1
 
-        if transform is not None:
-            out = transform(out)
         return out, pos
 
     elif peek == "'" or peek == '"':
-        return parse_string(buf, pos, output, transform)
+        return parse_string(buf, pos, output, options)
     elif peek in "-+0123456789":
 
         flt_end = None
@@ -392,8 +397,6 @@ def parse_object(buf, pos, output, transform=None):
 
         output.write(buf[start:end])
 
-        if transform is not None:
-            out = transform(out)
         return out, end
 
     else:
@@ -413,14 +416,12 @@ def parse_object(buf, pos, output, transform=None):
         out = builtin_names[item]
         output.write(item)
 
-        if transform is not None:
-            out = transform(out)
         return out, end
 
     raise ParserErr(buf, pos, "Bug in parser, sorry")
 
 
-def parse_key(buf, pos, output, transform):
+def parse_key(buf, pos, output, options):
     m = identifier.match(buf, pos)
     if m:
         name = buf[pos:m.end()]
@@ -434,10 +435,10 @@ def parse_key(buf, pos, output, transform):
             raise BadKey(buf, pos, "Expected space/newline after ':', got {}".format(repr(buf[pos:])))
         return name, pos, True
     else:
-        name, pos = parse_string(buf, pos, output, transform)
+        name, pos = parse_string(buf, pos, output, options)
         return name, pos, False
 
-def parse_string(buf, pos, output, transform):
+def parse_string(buf, pos, output, options):
     s = io.StringIO()
     peek = buf[pos]
 
@@ -496,13 +497,11 @@ def parse_string(buf, pos, output, transform):
 
     # XXX output.write string.escape
 
-    if transform is not None:
-        out = transform(out)
     return out, end
 
 def process(input_fh, output_fh):
     obj, output = parse(input_fh.read())
-    print(output, file=output_fh)
+    output_fh.write(output)
     return obj
 
 
