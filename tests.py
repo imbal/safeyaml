@@ -6,10 +6,10 @@ import safeyaml
 
 def smoke_tests():
     tests = {
-        """ [0] """:            0,
-        """ [1.2] """:           1.2,
-        """ [-3.4] """:         -3.4,
-        """ [+5.6] """:         +5.6,
+        """ [0] """:            [0],
+        """ [1.2] """:          [1.2],
+        """ [-3.4] """:         [-3.4],
+        """ [+5.6] """:         [+5.6],
         """ "test": 1 """:      {'test':1},
         """ n: 'test' """:      {'n':'test'},
         """ [1 ,2,3] """:       [1,2,3],
@@ -18,10 +18,16 @@ def smoke_tests():
         """ {'b':2,} """:     {'b':2},
         """ [1  #foo\n] """:    [1],
     }
-    for test in tests:
+    for code, ref_obj in tests.items():
         try:
-            out = safeyaml.parse(test)
-            print('.', end='', flush=True)
+            obj = safeyaml.parse(code)
+
+            if obj != ref_obj:
+                print()
+                print('X', 'smoke test failed: {} should produce {!r}, got {!r}'
+                    .format(code, ref_obj, obj))
+            else:
+                print('.', end='', flush=True)
         except safeyaml.ParserErr as p:
             print()
             print('X',repr(test),"gave",p.name())
