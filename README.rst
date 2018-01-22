@@ -19,7 +19,7 @@ What's allowed?
 It's best described as JSON plus the following:
 
 - You can use indentation for structure (braces are optional)
-- Keys can be unquoted (``foo: 1``, rather than ``"foo": 1``), or use ``''``'s too
+- Keys can be unquoted (``foo: 1``, rather than ``"foo": 1``), or quoted with ``''`` instead
 - Single-line comments with ``#``
 - Trailing commas allowed within ``[]`` or ``{}``
 
@@ -30,12 +30,10 @@ Here's an example::
   database:
     server: "192.168.1.1"
 
-    # JSON-style arrays
-    ports: [
-      8000,
-      8001,
-      8002,   
-    ]
+    ports:
+      - 8000
+      - 8001
+      - 8002
 
     enabled: true
 
@@ -43,11 +41,14 @@ Here's an example::
     # JSON-style objects
     alpha: {
       "ip": "10.0.0.1",
-      "dc": "eqdc10",
+      "names": [
+        "alpha",
+        "alpha.server",
+      ],
     }
     beta: {
       "ip": "10.0.0.2",
-      "dc": "eqdc10",
+      "names": ["beta"],
     }
 
 As for what's disallowed: a lot. String values must always be quoted. Boolean
@@ -83,24 +84,13 @@ How do I use it?
 ----------------
 
 The ``safeyaml`` executable will do its best to rewrite your YAML code, or fail
-with an error if it can't. Here's an example of a rewrite, wrapping a string in
-quotes and adding a trailing comma to an array::
+with an error if it can't. Here's an example of a rewrite::
 
   $ cat input.yaml
   title: My YAML file
-  numbers: [
-    1,
-    4,
-    9
-  ]
 
   $ safeyaml input.yaml
   title: "My YAML file"
-  numbers: [
-    1,
-    4,
-    9,
-  ]
 
 By default, the rewritten YAML is printed to standard output. You can pass
 ``-w`` to rewrite input files in-place instead.
