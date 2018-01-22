@@ -5,3 +5,4 @@ nested:
    "nice": 2
 "feels":
     pretty: "good"
+    what: {a.b: 123, c.d: 456}

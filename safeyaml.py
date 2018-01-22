@@ -148,13 +148,8 @@ def parse_structure(buf, pos, output, transform, indent=0):
             if not m:
                 break
 
-            m = identifier.match(buf, pos)
-            if m:
-                name = buf[pos:m.end()]
-                output.write(buf[pos:m.end()])
-                pos = m.end()
-            else:
-                name, pos = parse_string(buf, pos, output, transform)
+
+            name, pos = parse_key(buf, pos, output, transform)
 
             if buf[pos] != ':':
                 raise ParserErr(buf, pos, "Expected list item {}".format(repr(buf[pos:])))
@@ -213,7 +208,7 @@ def parse_object(buf, pos, output, transform=None):
         pos = skip_whitespace(buf, pos, output)
 
         while buf[pos] != '}':
-            key, pos = parse_object(buf, pos, output, transform)
+            key, pos = parse_key(buf, pos, output, transform)
 
             if key in out:
                 raise SemanticErr('duplicate key: {}, {}'.format(key, out))
@@ -350,6 +345,17 @@ def parse_object(buf, pos, output, transform=None):
         return out, end
 
     raise ParserErr(buf, pos)
+
+
+def parse_key(buf, pos, output, transform):
+    m = identifier.match(buf, pos)
+    if m:
+        name = buf[pos:m.end()]
+        output.write(buf[pos:m.end()])
+        pos = m.end()
+    else:
+        name, pos = parse_string(buf, pos, output, transform)
+    return name, pos
 
 def parse_string(buf, pos, output, transform):
     s = io.StringIO()
