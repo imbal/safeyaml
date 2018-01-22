@@ -15,9 +15,9 @@ flt_b10 = re.compile(r"\.[\d]+")
 exp_b10 = re.compile(r"[eE](?:\+|-)?[\d+]")
 
 string_dq = re.compile(
-    r'"(?:[^"\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\'"\\/bfnrt]|\\\r?\n|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"')
+    r'"(?:[^"\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\'"\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"')
 string_sq = re.compile(
-    r"'(?:[^'\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\"'\\/bfnrt]|\\\r?\n|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*'")
+    r"'(?:[^'\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\"'\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*'")
 
 identifier = re.compile(r"(?!\d)[\w\.]+")
 
@@ -36,6 +36,8 @@ str_escapes = {
 }
 
 builtin_names = {'null': None, 'true': True, 'false': False}
+
+reserved_names = set("yes|no|on|off".split("|"))
 
 class ParserErr(Exception):
     def __init__(self, buf, pos, reason=None):
@@ -336,10 +338,12 @@ def parse_object(buf, pos, output, transform=None):
         else:
             raise ParserErr(buf, pos)
 
-        if item not in builtin_names:
+
+        if item.lower() not in builtin_names:
             raise ParserErr(
                 buf, pos, "{} is not a recognised built-in".format(repr(item)))
 
+        item = item.lower()
         out = builtin_names[item]
         output.write(item)
 
@@ -354,6 +358,9 @@ def parse_key(buf, pos, output, transform):
     m = identifier.match(buf, pos)
     if m:
         name = buf[pos:m.end()]
+        if name.lower() in reserved_names:
+            raise ParserErr(buf, pos,"Can't use {} as a bareword key".format(name))
+
         output.write(buf[pos:m.end()])
         pos = m.end()
         # ugh, hack
@@ -414,8 +421,9 @@ def parse_string(buf, pos, output, transform):
                     buf, hi, 'string cannot have surrogate pairs')
             s.write(chr(n))
             lo = hi + 10
-        elif esc == '\n':
-            lo = hi + 2
+        # elif esc == '\n':
+        #     lo = hi + 2
+        #     while hi <  
         elif (buf[hi + 1:hi + 3] == '\r\n'):
             lo = hi + 3
         else:

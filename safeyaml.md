@@ -78,22 +78,27 @@ a:
 
 ## lint errors
 
+- `- - 1` not using a new line for a new indented block
+
 - bareword keys without trailing space
+- duplicate key error
 - tabs in indentation
-- allowed root objects
-- missing values in dict
-- empty document?
-- Yes/No/Off/On
+- string or int as  root objects
+- indented dict with key and empty value
+- empty indented list
+- reject empty document
+- Yes/No/Off/On error
+- leading zeros
 - octal, hex, sexagesimal errors
-- tags, local/builtin
-- anchors/aliases
-- directives
+- tags, local/builtin !, !! errors
+- anchors/aliases & * errors
+- directives '%'
 - string contents: printables, unicode, surrogates
-- string escapes: \nl & trailing whitespace
-- dict contents: duplicate keys, normalisation
-- document seperators
-- "?" key syntax, "|"/">" flow modes
-- barewords
-- reserved '`' and '@'
+  cleanup/errors/normalization
+  errors for non-json escapes, exce ptfor x,u,U
+- errors for document seperators
+- errors for "?" key syntax, "|"/">" flow modes
+- errors for barewords
+- errors for reserved '`' and '@'
 
 
