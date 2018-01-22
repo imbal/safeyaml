@@ -29,19 +29,18 @@ for test in glob.glob("spec/*.yaml"):
     with open(test) as fh:
         contents = fh.read()
 
-        print("---")
-        for line in contents.split('\n'):
-            print(">", line)
-        print("---")
-
         expected = yaml.load(contents)
         
         obj, output = safeyaml.parse(contents)
-
-        print(obj)
-        print(expected)
-
         print("---")
-        for line in output.split('\n'):
-            print("<", line)
+        for line in zip(contents.split('\n'),output.split('\n')):
+            print(">", line[0],'$')
+            print("<", line[1], '$')
+            if line[0] != line[1]:
+                raise('butt')
         print("---")
+        expected_out = yaml.load(output)
+
+        if expected != expected_out:
+            raise Exception('no')
+

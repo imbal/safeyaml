@@ -163,7 +163,8 @@ def parse_structure(buf, pos, output, transform, indent=0):
                 output.write(buf[pos:new_pos])
                 obj, pos = parse_object(buf, new_pos, output, transform)
             else:
-                obj, pos = parse_structure(buf, pos, output, transform, indent=my_indent)
+                output.write(buf[pos:new_pos-new_indent])
+                obj, pos = parse_structure(buf, new_pos-new_indent, output, transform, indent=my_indent)
 
             # dupe check
             out[name] = obj
@@ -268,6 +269,7 @@ def parse_object(buf, pos, output, transform=None):
                 raise ParserErr(
                     buf, pos, "Expecting a ',', or a ']' but found {}".format(repr(peek)))
 
+        output.write("]")
         pos += 1
 
         if transform is not None:
