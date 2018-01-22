@@ -3,7 +3,15 @@ import os
 import glob
 import yaml
 import pytest
-import safeyaml
+
+
+safeyaml_globals = {}
+with open('safeyaml') as fh:
+    exec(fh.read(), safeyaml_globals, safeyaml_globals)
+
+class safeyaml:
+    ParserErr = safeyaml_globals['ParserErr']
+    parse = safeyaml_globals['parse']
 
 
 SMOKE_TESTS = {
