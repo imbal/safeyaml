@@ -598,7 +598,7 @@ def parse_bareword(buf, pos, output, options):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="SafeYAML Linter, checks (or formats) a YAML file for common ambiguities")
 
-    parser.add_argument("file", nargs="?", default=None, help="filename to read, without will read from stdin")
+    parser.add_argument("file", nargs="*", default=None, help="filename to read, without will read from stdin")
     parser.add_argument("--fix",  action='store_true', default=False, help="ask the parser to hog wild")
     parser.add_argument("--fix-barewords",  action='store_true', default=False, help="ask the parser to try its best to parse barewords")
     parser.add_argument("--fix-nodent",  action='store_true', default=False, help="fix lists to nest inside maps with same indent")
@@ -606,13 +606,11 @@ if __name__ == '__main__':
     parser.add_argument("--force-strings",  action='store_true', default=False, help="quote every bareword")
     parser.add_argument("--force-commas",  action='store_true', default=False, help="trailing commas")
     parser.add_argument("--quiet", action='store_true', default=False, help="don't print cleaned file")
+    parser.add_argument("--in-place", action='store_true', default=False, help="edit file")
+
     parser.add_argument("--json", action='store_true', default=False, help="output json instead of yaml")
 
     args = parser.parse_args() # will only return when action is given
-
-
-    input_fh, output_fh = sys.stdin, sys.stdout
-    filename = "<stdin>"
     
     options = Options(
             fix_barewords=args.fix_barewords or args.fix,
@@ -622,24 +620,57 @@ if __name__ == '__main__':
             force_commas=args.force_commas,
     )
 
-    if args.file:
-        input_fh = open(args.file) # closed on exit
-        filename = args.file
-
-    try:
-        output = io.StringIO()
-        obj = parse(input_fh.read(), output=output, options=options)
-    except ParserErr as p:
-        line, col = get_position(p.buf, p.pos)
-        print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
-        sys.exit(-2)
-
-    if not args.quiet:
-
+    if args.in_place:
         if args.json:
-            json.dump(obj, output_fh)
-        else:
-            output_fh.write(output.getvalue())
+            print('error: safeyaml --in-place cannot be used with --json')
+            print()
+            sys.exit(-2)
+
+        if len(args.file) < 1:
+            print('error: safeyaml --in-place takes at least one file')
+            print()
+            sys.exit(-2)
+
+        for filename in args.file:
+            with open(filename, 'r+') as fh:
+                try:
+                    output = io.StringIO()
+                    obj = parse(fh.read(), output=output, options=options)
+                except ParserErr as p:
+                    line, col = get_position(p.buf, p.pos)
+                    print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
+                    sys.exit(-2)
+                else:
+                    fh.truncate(0)
+                    fh.write(output.getvalue())
+
+    else:
+        input_fh, output_fh = sys.stdin, sys.stdout
+        filename = "<stdin>"
+
+        if args.file:
+            if len(args.file) > 1:
+                print('error: safeyaml only takes one file as argument, unless --in-place given')
+                print()
+                sys.exit(-1)
+
+            input_fh = open(args.file[0]) # closed on exit
+            filename = args.file
+
+        try:
+            output = io.StringIO()
+            obj = parse(input_fh.read(), output=output, options=options)
+        except ParserErr as p:
+            line, col = get_position(p.buf, p.pos)
+            print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
+            sys.exit(-2)
+
+        if not args.quiet:
+
+            if args.json:
+                json.dump(obj, output_fh)
+            else:
+                output_fh.write(output.getvalue())
 
     sys.exit(0)
 
