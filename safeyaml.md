@@ -101,3 +101,10 @@ Like so:
  - thing
  - thing
 ```
+
+# Barewords
+
+Barewords are allowed as the keys for objects, that match a identifier like pattern
+
+- Leading Character (non digit)
+- Then Alphanumeric, `_` and `.`
