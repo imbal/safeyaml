@@ -104,3 +104,23 @@ How do I generate it?
 ---------------------
 
 Don't. That's not what YAML is for. Generate JSON if you need to serialize data.
+
+
+A Bigger Example
+----------------
+
+  $ cat input.yaml 
+  name: key
+  setting:{a:1,b:2}
+  off:on
+  yes:
+  - no
+  
+  $ ./safeyaml input.yaml --allow-barewords --allow-nospace --allow-nodent --force-strings
+  "name": "key"
+  "setting": {"a": 1,"b": 2}
+  "off": "on"
+  "yes":
+   - "no"
+
+

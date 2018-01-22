@@ -56,10 +56,11 @@ def get_position(buf, pos):
         return line, col
 
 class Options:
-    def __init__(self, allow_barewords=False, allow_nodent=False, allow_nospace=False):
+    def __init__(self, allow_barewords=False, allow_nodent=False, allow_nospace=False, force_strings=False):
         self.allow_barewords = allow_barewords
         self.allow_nodent = allow_nodent
         self.allow_nospace = allow_nospace
+        self.force_strings = force_strings
 
 class ParserErr(Exception):
     def name(self):
@@ -393,13 +394,24 @@ def parse_map(buf, pos, output, options):
 def parse_key(buf, pos, output, options):
     m = identifier.match(buf, pos)
     if m:
-        name = buf[pos:m.end()]
-        if name.lower() in reserved_names:
-            raise ReservedKey(buf, pos,"Found '{}' as a bareword key, which can be parsed as a boolean. Please use quotes around it.".format(name))
+        item = buf[pos:m.end()]
+        name = item.lower()
 
-        output.write(buf[pos:m.end()])
+        if name in builtin_names:
+            if options.allow_barewords:
+                item = '"{}"'.format(item)
+            else:
+                raise BadKey(buf, pos,"Found '{}' as a bareword key, Please use quotes around it.".format(item))
+        elif name in reserved_names:
+            if options.allow_barewords:
+                item = '"{}"'.format(item)
+            else:
+                raise ReservedKey(buf, pos,"Found '{}' as a bareword key, which can be parsed as a boolean. Please use quotes around it.".format(item))
+        elif options.force_strings:
+            item = '"{}"'.format(item)
+
+        output.write(item)
         pos = m.end()
-        # ugh, hack
         return name, pos, True
     else:
         name, pos = parse_string(buf, pos, output, options)
@@ -576,6 +588,7 @@ if __name__ == '__main__':
     parser.add_argument("--allow-barewords",  action='store_true', default=False, help="ask the parser to try its best to parse barewords")
     parser.add_argument("--allow-nodent",  action='store_true', default=False, help="allow lists to nest inside maps with same indent")
     parser.add_argument("--allow-nospace",  action='store_true', default=False, help="allow map keys not to have ' ' after a ':'")
+    parser.add_argument("--force-strings",  action='store_true', default=False, help="quote every bareword")
     parser.add_argument("--quiet", action='store_true', default=False, help="don't print cleaned file")
     parser.add_argument("--json", action='store_true', default=False, help="output json instead of yaml")
 
@@ -589,6 +602,7 @@ if __name__ == '__main__':
             allow_barewords=args.allow_barewords,
             allow_nodent=args.allow_nodent,
             allow_nospace=args.allow_nospace,
+            force_strings=args.force_strings
     )
 
     if args.file:
