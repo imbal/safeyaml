@@ -12,6 +12,7 @@ with open('safeyaml') as fh:
 class safeyaml:
     ParserErr = safeyaml_globals['ParserErr']
     parse = safeyaml_globals['parse']
+    Options = safeyaml_globals['Options']
 
 
 SMOKE_TESTS = {

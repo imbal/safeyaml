@@ -132,6 +132,7 @@ def parse(buf, output=None, options=None):
         raise NoRootDocument(buf, pos, "Empty Document")
 
     output = output or io.StringIO()
+    options = options or Options()
     pos = 1 if buf.startswith("\uFEFF") else 0
 
     obj, pos = parse_structure(buf, pos, output, options, at_root=True)
