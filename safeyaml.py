@@ -3,6 +3,7 @@
 import io
 import re
 import sys
+import json
 import argparse
 
 from collections import OrderedDict
@@ -504,7 +505,7 @@ def parse_string(buf, pos, output, options):
 
 def process(input_fh, output_fh):
     output = io.StringIO()
-    obj, output = parse(input_fh.read(), output=output, options=None)
+    obj = parse(input_fh.read(), output=output, options=None)
     output_fh.write(output.getvalue())
     return obj
 
@@ -512,7 +513,7 @@ def process(input_fh, output_fh):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="SafeYAML Linter, checks (or formats) a YAML file for common ambiguities")
 
-    parser.add_argument("action", nargs=1, help="check or fix", default=None)
+    parser.add_argument("action", nargs=1, help="check or fix or json", default=None)
     parser.add_argument("file", nargs="?", default=None, help="filename to read, without will read from stdin")
 
     args = parser.parse_args() # will only return when action is given
@@ -531,6 +532,10 @@ if __name__ == '__main__':
             process(in_fh, out_fh)
         elif action == 'fix':
             raise Exception('unimplemented')
+        elif action == 'json':
+            output = io.StringIO()
+            obj= parse(in_fh.read(), output=output, options=None)
+            json.dump(obj, out_fh)
         else:
             parser.print_help()
             sys.exit(-1)
