@@ -2,11 +2,9 @@
 
 import re
 import io
-import base64
-import json
+import sys
 
-from collections import namedtuple, OrderedDict
-from enum import Enum
+from collections import OrderedDict
     
 whitespace = re.compile(r"(?:\ |\t|\r|\n)+")
         
@@ -109,7 +107,6 @@ def parse_structure(buf, pos, output, transform, indent=0):
     
     if peek == '-':
         out = []
-        print(indent, my_indent, out)
         while pos < len(buf):
             if buf[pos] != '-':
                 break
@@ -264,7 +261,7 @@ def parse_object(buf, pos, output, transform=None):
 
             peek = buf[pos]
             if peek == ',':
-                output.append(',')
+                output.write(',')
                 pos += 1
                 pos = skip_whitespace(buf, pos, output)
             elif peek != ']':
@@ -425,20 +422,6 @@ def parse_string(buf, pos, output, transform):
     return out, end
 
 if __name__ == '__main__':
-    tests = """
-        0
-        1.2
-        -3.4
-        +5.6
-        "test"
-        'test'
-        [1,2,3]
-        [1,2,3,]
-        {"a":1}
-        {'b':2,}
-        1 # foo """
-    for test in tests.split("\n"):
-        test.strip()
-        if not test: continue
-        print(repr(test))
-        print('=>', parse(test)[0])
+    fh = sys.stdin
+    obj, output = parse(fh.read())
+    print(output)
