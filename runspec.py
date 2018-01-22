@@ -40,6 +40,7 @@ def test_spec(test):
         except safeyaml.ParserErr as p:
             with open('{}.bad'.format(test)) as fh:
                 name, pos = fh.readline().split(':')
+                pos = int(pos)
             if p.name() == name and p.pos == pos:
                 print('.', end='', flush=True)
                 return

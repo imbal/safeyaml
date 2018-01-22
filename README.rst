@@ -1,9 +1,6 @@
 SafeYAML
 ========
 
-NOTE: This is a speculative README from @aanand, and a speculative attempt at
-implementation & specification by @tef.
-
 SafeYAML is an aggressively small subset of YAML. It's everything you need for
 human-readable-and-writable configuration files, and nothing more.
 
@@ -53,7 +50,7 @@ Here's an example::
 
 As for what's disallowed: a lot. String values must always be quoted. Boolean
 values must be written as ``true`` or ``false`` (``yes``, ``Y``, ``y``, ``on``
-etc are not allowed). Indented blocks must start on their own line.
+etc are not allowed). *Indented blocks must start on their own line*.
 
 No anchors, no references. No multi-line strings. No multi-document streams. No
 custom tagged values. No Octal, or Hexadecimal. *No sexagesimal numbers.*
@@ -83,27 +80,23 @@ continue to use it - it's just one more step in your code quality process.
 How do I use it?
 ----------------
 
-The ``safeyaml`` executable will do its best to rewrite your YAML code, or fail
-with an error if it can't. Here's an example of a rewrite::
+The ``safeyaml`` executable will do its best to validate your YAML code, or fail
+with an error if it can't. Here's an example of a validate::
 
   $ cat input.yaml
   title: My YAML file
 
-  $ safeyaml input.yaml
+  $ safeyaml.py check input.yaml
   title: "My YAML file"
 
-By default, the rewritten YAML is printed to standard output. You can pass
-``-w`` to rewrite input files in-place instead.
 
 Here's an example of an error, which must be fixed manually::
 
   $ cat input.yaml
   command: yes
 
-  $ safeyaml input.yaml
-  input.yaml:1:9: found unquoted value `yes`, which could be a string or a
-  boolean. Please either surround it in quotes if it's a string, or replace it
-  with `true` if it's a boolean.
+  $ safeyaml fix input.yaml
+  input.yaml:10:ReservedKey:Can't use 'yes' as a value. Please either surround it in quotes if it's a string, or replace it with `true` if it's a boolean.
 
 
 How do I generate it?

@@ -409,6 +409,9 @@ def parse_object(buf, pos, output, options=None):
             raise Bareword(buf, pos, "The parser doesn't know how to parse anymore and has given up. Use less barewords")
 
 
+        if item.lower() in reserved_names:
+            raise ReservedKey(buf, pos,"Can't use '{}' as a value. Please either surround it in quotes if it\'s a string, or replace it with `true` if it\'s a boolean.".format(item))
+
         if item.lower() not in builtin_names:
             raise Bareword(buf, pos, "{} doesn't look like 'true', 'false', or 'null', who are you kidding ".format(repr(item)))
 
@@ -426,7 +429,7 @@ def parse_key(buf, pos, output, options):
     if m:
         name = buf[pos:m.end()]
         if name.lower() in reserved_names:
-            raise ReservedKey(buf, pos,"Can't use {} as a bareword key".format(name))
+            raise ReservedKey(buf, pos,"Found '{}' as a bareword key, which can be parsed as a boolean. Please use quotes around it.".format(name))
 
         output.write(buf[pos:m.end()])
         pos = m.end()

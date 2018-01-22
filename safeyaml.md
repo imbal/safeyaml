@@ -1,8 +1,39 @@
-# specification
+# Specification
 
-## grammar
+This is a rough overview of the subset of YAML, but it's best to think of it as a superset of JSON, with:
 
-ws = (whitespace| newline | comment)*
+Like JSON:
+
+- Root Objects can only be lists or objects, and not strings or numbers.
+- Integers cannot have a leading 0
+- Strings cannot be multi line
+
+Like YAML:
+
+- Trailing commas allowed in `[]`, or `{}`
+- Byte Order Marks are ignored at start of document
+- Trailing whitespace is ignored
+- Objects and lists have *flow* syntax, or indented block forms.
+- A ": " must follow a bareword key
+- Strings can use the `\xFF` and `\UFFFFFFFF` along with `\uFFFF` to specify a codepoint
+
+Unlike both:
+
+- JSON allows surrogate pairs, SafeYAML requries utf-8 and codepoints.
+- JSON and YAML allow duplicate keys, SafeYAML rejects them
+
+In YAML but not in SafeYAML:
+
+- `*` and `&` are unsupported
+- No tags allowed `!` `!!`
+- No multiline strings, or flow-forms '|' '>'
+- All YAML string escapes (except `x` `U` are unsupported)
+- Merge keys or '<<' unsupported
+- No '?' key syntax
+
+## Rough Grammar
+
+ws :== (whitespace| newline | comment)*
 
 document :== bom? ws root ws
 
@@ -30,29 +61,38 @@ indented_object :== indent indented_key ': ' indented_value (nl indented_key ': 
 
 indented_list :== indent '- ' indented_value (nl '- ' idented_value)  dedent
 
-where indent/dedent happen like in python's lexer, when the indent is bigger/smaller, with an implied indent/dedent
-around whole stream
+# Indentation Rules
 
-i.e
+Idented blocks `- item` or `name: value` cannot be nested on the same line, and nested items must be indented further in.
+
+For example
 
 ```
-- 1
-- 2
+- "One"
+- "Two"
+- 
+  name_one: 3  
+  name_two: 4
+
 ```
+
+And not:
 
 ```
 name:
- - list
-otherName: {"a": value}
+- 1 # Error: shoud be indented one
 ```
 
-can't nest indentation directives on same line
+Indented blocks must not share lines:
 
 ```
-- a: thing
-- - thing
-  - thing
+- a: thing  # a:thing needs to be on own line
+
+- - thing_a # - thing_a needs own line
+  - thing_b
 ```
+
+Like so:
 
 ```
 - 
@@ -61,44 +101,3 @@ can't nest indentation directives on same line
  - thing
  - thing
 ```
-
-indentation level must increase
-
-```
-a: 
-- what
-```
-
-but
-
-```
-a:
- - what
-```
-
-## lint errors
-
-- `- - 1` not using a new line for a new indented block
-
-- bareword keys without trailing space
-- duplicate key error
-- tabs in indentation
-- string or int as  root objects
-- indented dict with key and empty value
-- empty indented list
-- reject empty document
-- Yes/No/Off/On error
-- leading zeros
-- octal, hex, sexagesimal errors
-- tags, local/builtin !, !! errors
-- anchors/aliases & * errors
-- directives '%'
-- string contents: printables, unicode, surrogates
-  cleanup/errors/normalization
-  errors for non-json escapes, exce ptfor x,u,U
-- errors for document seperators
-- errors for "?" key syntax, "|"/">" flow modes
-- errors for barewords
-- errors for reserved '`' and '@'
-
-
