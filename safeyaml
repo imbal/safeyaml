@@ -641,6 +641,7 @@ if __name__ == '__main__':
                     print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
                     sys.exit(-2)
                 else:
+                    fh.seek(0)
                     fh.truncate(0)
                     fh.write(output.getvalue())
 
