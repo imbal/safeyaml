@@ -56,9 +56,10 @@ def get_position(buf, pos):
         return line, col
 
 class Options:
-    def __init__(self, allow_barewords=False, allow_nodent=False):
+    def __init__(self, allow_barewords=False, allow_nodent=False, allow_nospace=False):
         self.allow_barewords = allow_barewords
         self.allow_nodent = allow_nodent
+        self.allow_nospace = allow_nospace
 
 class ParserErr(Exception):
     def name(self):
@@ -276,7 +277,10 @@ def parse_indented_map(buf, pos, output, options, my_indent, at_root):
         output.write(":")
         pos +=1
         if buf[pos] not in (' ', '\r','\n'):
-            raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(name),repr(buf[pos:])))
+            if options.allow_nospace:
+                output.write(' ')
+            else:
+                raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(name),repr(buf[pos:])))
 
         handled_nodent = False
         
@@ -357,9 +361,16 @@ def parse_map(buf, pos, output, options):
         if peek == ':':
             output.write(':')
             pos += 1
-            pos = skip_whitespace(buf, pos, output)
         else:
             raise BadKey( buf, pos, "Expected a ':', when parsing a key: value pair but found {}".format(repr(peek)))
+
+        if is_bare and buf[pos] not in (' ', '\r','\n'):
+            if options.allow_nospace:
+                output.write(' ')
+            else:
+                raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(key),repr(buf[pos:])))
+
+        pos = skip_whitespace(buf, pos, output)
 
         item, pos = parse_value(buf, pos, output, options)
 
@@ -389,8 +400,6 @@ def parse_key(buf, pos, output, options):
         output.write(buf[pos:m.end()])
         pos = m.end()
         # ugh, hack
-        if buf[pos+1:pos+2] not in (' ', '\r','\n'):
-            raise BadKey(buf, pos, "Expected space/newline after ':', got {}".format(repr(buf[pos:])))
         return name, pos, True
     else:
         name, pos = parse_string(buf, pos, output, options)
@@ -566,6 +575,7 @@ if __name__ == '__main__':
     parser.add_argument("file", nargs="?", default=None, help="filename to read, without will read from stdin")
     parser.add_argument("--allow-barewords",  action='store_true', default=False, help="ask the parser to try its best to parse barewords")
     parser.add_argument("--allow-nodent",  action='store_true', default=False, help="allow lists to nest inside maps with same indent")
+    parser.add_argument("--allow-nospace",  action='store_true', default=False, help="allow map keys not to have ' ' after a ':'")
     parser.add_argument("--quiet", action='store_true', default=False, help="don't print cleaned file")
     parser.add_argument("--json", action='store_true', default=False, help="output json instead of yaml")
 
@@ -578,6 +588,7 @@ if __name__ == '__main__':
     options = Options(
             allow_barewords=args.allow_barewords,
             allow_nodent=args.allow_nodent,
+            allow_nospace=args.allow_nospace,
     )
 
     if args.file:
