@@ -129,7 +129,7 @@ class UnsupportedEscape(ParserErr):
 
 def parse(buf, output=None, options=None):
     if not buf:
-        raise NoRootDocument(buf, pos, "Empty Document")
+        raise NoRootObject(buf, 0, "Empty Document")
 
     output = output or io.StringIO()
     options = options or Options()
