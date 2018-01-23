@@ -82,11 +82,11 @@ continue to use it - it's just one more step in your code quality process.
 How do I use it?
 ----------------
 
-The ``safeyaml`` executable will do its best to validate your YAML code, or fail
-with an error if it can't. Here's an example of a validate::
+The ``safeyaml`` executable will validate your YAML code, or fail with an error
+if it can't. Here's an example of a passing validation::
 
   $ cat input.yaml
-  title: My YAML file
+  title: "My YAML file"
 
   $ safeyaml input.yaml
   title: "My YAML file"
@@ -100,44 +100,41 @@ Here's an example of an error::
   input.yaml:1:11:Can't use 'yes' as a value. Please either surround it in quotes
   if it's a string, or replace it with `true` if it's a boolean.
 
+With the ``--fix`` option, ``safeyaml`` can automatically repair some problems
+within YAML files.
 
-How do I generate it?
----------------------
-
-Don't. That's not what YAML is for. Generate JSON if you need to serialize data.
-
-Repairing YAML
---------------
-
-``safeyaml`` can repair some problems within YAML files automatically.
-
-Here's an example file that has some errors and some ambiguity::
+Here's an example file that has some problems::
 
   $ cat input.yaml 
-  name: key                     # Bareword key
-  setting:{a:1,b:2}             # Missing ' ' after ':'
-  off:on                        # Ambigious key, ambigious value
-  yes:                          # Ambigious key
-  - no                          # SafeYAML requires `- no` to be indented
+  name: sonic the hedgehog      # Unquoted string
+  settings:{a:1,b:2}            # Missing ' ' after ':'
+  list:
+  - "item"                      # Unindented list item
   
-  $ ./safeyaml input.yaml --fix-unquoted --fix-nospace --fix-nodent --force-string-keys
-  "name": "key"
-  "setting": {"a": 1,"b": 2}
-  "off": "on"
-  "yes":
-   - "no"
+  $ safeyaml --fix input.yaml
+  name: "sonic the hedgehog"
+  settings: {a: 1,b: 2}
+  list:
+    - "item"
 
-``--fix-unquoted`` will allow unquoted values inside an indented map. This does not affect map keys (which must still be in identifier format, i.e ``a1.b2.c2``).
+To rewrite the fixed YAML back to the input files, pass the ``--in-place`` flag::
 
-``--fix-nospace`` ensures that all keys are followed by ``: ``.
+  $ safeyaml --fix --in-place input.yaml
 
-``--fix-nodent`` allows list items to be inside of maps without additional indentation. 
+You can turn individual "fix" rules off and on:
 
-``--fix`` enables all ``--fix-*`` options
+``--fix-unquoted`` will put quotes around unquoted strings inside an indented map. This does not affect map keys (which must still be in identifier format, i.e ``a1.b2.c2``).
+
+``--fix-nospace`` ensures that at least one space follows the ``:`` after every key.
+
+``--fix-nodent`` ensures list items inside maps are further indented than their parent key.
+
+There are also some more forceful options which aren't included in ``--fix``:
 
 ``--force-string-keys`` turns every key into a string. This will replace any key that has a boolean or null ('true' etc) with the string version (i.e ``"true"``).  
 
 ``--force-commas`` ensures every non-empty list or map has a trailing comma.
+
 
 Other Arguments
 ---------------
@@ -146,4 +143,9 @@ Other Arguments
 
 ``--quiet`` don't output YAML on success.
 
-``--in-place`` if fixes/parsing successful, write changes back in-place.
+
+How do I generate it?
+---------------------
+
+Don't. Generating YAML is almost always a bad idea. Generate JSON if you need to
+serialize data.
