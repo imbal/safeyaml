@@ -23,7 +23,7 @@ string_sq = re.compile(
     r"'(?:[^'\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\"'\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*'")
 
 identifier = re.compile(r"(?!\d)[\w\.]+")
-barewords = re.compile(r"(?!\d)[\w\.]+(?:(?![\r\n#$@%`,:\"\|'\[\]\{\}\&\*\?\<\>]).)*")
+barewords = re.compile(r"(?!\d)(?:(?![\r\n#$@%`,:\"\|'\[\]\{\}\&\*\?\<\>]).)*")
 
 key_name = re.compile("(?:{}|{}|{})".format(string_dq.pattern, string_sq.pattern, identifier.pattern))
 
@@ -215,9 +215,15 @@ def parse_structure(buf, pos, output, options, indent=0, at_root=False):
         return parse_indented_map(buf, pos, output, options, my_indent, at_root)
 
     if peek == '{':
-        return parse_map(buf, pos, output, options)
+        if at_root:
+            return parse_map(buf, pos, output, options)
+        else:
+            raise BadIndent(buf, pos, "Expected an indented object or indented list, but found {} on next line")
     if peek == '[':
-        return parse_list(buf, pos, output, options)
+        if at_root:
+            return parse_list(buf, pos, output, options)
+        else:
+            raise BadIndent(buf, pos, "Expected an indented object or indented list, but found [] on next line")
 
     if peek in "+-0123456789":
         if at_root:
@@ -592,7 +598,7 @@ def parse_bareword(buf, pos, output, options):
                 output.write(' ')
 
             return item, m.end()
-    raise Bareword(buf, pos, "The parser doesn't know how to parse anymore and has given up. Use less barewords")
+    raise Bareword(buf, pos, "The parser doesn't know how to parse anymore and has given up. Use less barewords: {}...".format(repr(buf[pos:pos+5])))
 
 
 if __name__ == '__main__':
