@@ -27,41 +27,65 @@ def test_smoke(code, ref_obj):
     assert obj == ref_obj
 
 
-@pytest.mark.parametrize("path", glob.glob("tests/*.yaml"))
-def test_file(path):
+@pytest.mark.parametrize("path", glob.glob("tests/validate/*.yaml"))
+def test_validate(path):
+    check_file(path, validate=True)
+
+
+@pytest.mark.parametrize("path", glob.glob("tests/fix/*.yaml"))
+def test_fix(path):
+    check_file(path, fix=True)
+
+
+def check_file(path, validate=False, fix=False):
+    output_file = '{}.output'.format(path)
+    error_file = '{}.error'.format(path)
+
     with open(path) as fh:
         contents = fh.read()
-        try:
-            ref_obj = yaml.load(contents)
-        except:
-            raise Exception("input isn't valid YAML: {}".format(contents))
 
-        try:
-            output = io.StringIO()
-            obj = safeyaml.parse(contents, output=output)
-            output = output.getvalue()
-
-        except safeyaml.ParserErr as p:
-            with open('{}.bad'.format(path)) as fh:
+        if os.path.exists(error_file):
+            with open(error_file) as fh:
                 name, pos = fh.readline().split(':')
                 pos = int(pos)
 
-            assert p.name() == name and p.pos == pos
+            with pytest.raises(safeyaml.ParserErr) as excinfo:
+                safeyaml.parse(contents)
+
+            error = excinfo.value
+            assert error.name() == name
+            assert error.pos == pos
             return
 
-        assert obj == ref_obj
+        options = safeyaml.Options(
+            fix_unquoted=fix,
+            fix_nodent=fix,
+            fix_nospace=fix,
+        )
 
-        try:
-            parsed_output = yaml.load(output)
-        except Exception as e:
-            raise Exception("output isn't valid YAML: {}".format(output))
+        output = io.StringIO()
+        obj = safeyaml.parse(contents, output=output, options=options)
+        output = output.getvalue()
 
-        assert parsed_output == ref_obj
+        if validate:
+            try:
+                ref_obj = yaml.load(contents)
+            except:
+                raise Exception("input isn't valid YAML: {}".format(contents))
 
-        with open('{}.ok'.format(path)) as fh:
-            expected_output = fh.read()
+            assert obj == ref_obj
 
-        assert output == expected_output
+            try:
+                parsed_output = yaml.load(output)
+            except Exception as e:
+                raise Exception("output isn't valid YAML: {}".format(output))
+
+            assert parsed_output == ref_obj
+
+        if fix:
+            with open(output_file) as fh:
+                expected_output = fh.read()
+                assert output == expected_output
 
 
 if __name__ == '__main__':
