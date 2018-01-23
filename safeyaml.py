@@ -41,7 +41,7 @@ str_escapes = {
 
 builtin_names = {'null': None, 'true': True, 'false': False}
 
-reserved_names = set("yes|no|on|off".split("|"))
+reserved_names = set("y|n|yes|no|on|off".split("|"))
 
 newlines = re.compile(r'\r?\n') # Todo: unicode
 def get_position(buf, pos):
