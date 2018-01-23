@@ -5,7 +5,7 @@ This is a rough overview of the subset of YAML, but it's best to think of it as 
 Like JSON:
 
 - Root Objects can only be lists or objects, and not strings or numbers.
-- Integers cannot have a leading 0
+- Non-Zero Integers cannot have a leading 0
 - Strings cannot be multi line
 
 Like YAML:
@@ -16,20 +16,23 @@ Like YAML:
 - Objects and lists have *flow* syntax, or indented block forms.
 - A ": " must follow a bareword key
 - Strings can use the `\xFF` and `\UFFFFFFFF` along with `\uFFFF` to specify a codepoint
+- Unquoted keys are supported that match an indentifier like format (leading character (not a number) followed by any number, char, `.` or `_`.
 
 Unlike both:
 
 - JSON allows surrogate pairs, SafeYAML requries utf-8 and codepoints.
 - JSON and YAML allow duplicate keys, SafeYAML rejects them
+- Indented maps/lists take a value on the same line *or* an indented map/list on the next line
 
-In YAML but not in SafeYAML:
+Not in SafeYAML but in YAML
 
-- `*` and `&` are unsupported
-- No tags allowed `!` `!!`
-- No multiline strings, or flow-forms '|' '>'
+- `*` and `&` are unsupported operations.
+- No tags allowed `!` `!!`.
+- No multiline strings, or flow-forms for strings '|' '>'
 - All YAML string escapes (except `x` `U` are unsupported)
 - Merge keys or '<<' unsupported
 - No '?' key syntax
+- Indented blocks cannot be nested on the same line.
 
 ## Rough Grammar
 
