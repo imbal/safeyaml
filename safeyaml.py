@@ -7,25 +7,28 @@ import json
 import argparse
 
 from collections import OrderedDict
-    
+
 whitespace = re.compile(r"(?:\ |\t|\r|\n)+")
-        
+
 comment = re.compile(r"(#[^\r\n]*(?:\r?\n|$))+")
-import sys
 
 int_b10 = re.compile(r"\d[\d]*")
 flt_b10 = re.compile(r"\.[\d]+")
 exp_b10 = re.compile(r"[eE](?:\+|-)?[\d+]")
 
 string_dq = re.compile(
-    r'"(?:[^"\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\'"\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"')
+    r'"(?:[^"\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\'"\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"'
+)
 string_sq = re.compile(
-    r"'(?:[^'\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\"'\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*'")
+    r"'(?:[^'\\\n\x00-\x1F\uD800-\uDFFF]|\\(?:[\"'\\/bfnrt]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*'"
+)
 
 identifier = re.compile(r"(?!\d)[\w\.]+")
-barewords = re.compile(r"(?!\d)[\w\.]+(?:(?![\r\n#$@%`,:\"\|'\[\]\{\}\&\*\?\<\>]).)*")
+barewords = re.compile(
+    r"(?!\d)[\w\.]+(?:(?![\r\n#$@%`,:\"\|'\[\]\{\}\&\*\?\<\>]).)*")
 
-key_name = re.compile("(?:{}|{}|{})".format(string_dq.pattern, string_sq.pattern, identifier.pattern))
+key_name = re.compile("(?:{}|{}|{})".format(
+    string_dq.pattern, string_sq.pattern, identifier.pattern))
 
 str_escapes = {
     'b': '\b',
@@ -43,29 +46,39 @@ builtin_names = {'null': None, 'true': True, 'false': False}
 
 reserved_names = set("y|n|yes|no|on|off".split("|"))
 
-newlines = re.compile(r'\r?\n') # Todo: unicode
-def get_position(buf, pos):
-        "Given a new offset, find the next position"
-        line = 1
-        line_off = 0
-        for match in newlines.finditer(buf, 0, pos):
-            line += 1;
-            line_off = match.end()
+newlines = re.compile(r'\r?\n')  # Todo: unicode
 
-        col = (pos-line_off)+1
-        return line, col
+
+def get_position(buf, pos):
+    "Given a new offset, find the next position"
+    line = 1
+    line_off = 0
+    for match in newlines.finditer(buf, 0, pos):
+        line += 1
+        line_off = match.end()
+
+    col = (pos - line_off) + 1
+    return line, col
+
 
 class Options:
-    def __init__(self, fix_unquoted=False, fix_nodent=False, fix_nospace=False, force_string_keys=False, force_commas=False):
+    def __init__(self,
+                 fix_unquoted=False,
+                 fix_nodent=False,
+                 fix_nospace=False,
+                 force_string_keys=False,
+                 force_commas=False):
         self.fix_unquoted = fix_unquoted
         self.fix_nodent = fix_nodent
         self.fix_nospace = fix_nospace
         self.force_string_keys = force_string_keys
         self.force_commas = force_commas
 
+
 class ParserErr(Exception):
     def name(self):
         return self.__class__.__name__
+
     def explain(self):
         return self.reason
         return "{}:{}".format(self.name(), self.reason)
@@ -86,8 +99,10 @@ class ParserErr(Exception):
 class SemanticErr(ParserErr):
     pass
 
+
 class DuplicateKey(SemanticErr):
     pass
+
 
 class ReservedKey(SemanticErr):
     pass
@@ -96,32 +111,42 @@ class ReservedKey(SemanticErr):
 class SyntaxErr(ParserErr):
     pass
 
+
 class BadIndent(SyntaxErr):
     pass
+
 
 class BadKey(SyntaxErr):
     pass
 
+
 class Bareword(ParserErr):
     pass
+
 
 class BadString(SyntaxErr):
     pass
 
+
 class BadNumber(SyntaxErr):
     pass
+
 
 class NoRootObject(SyntaxErr):
     pass
 
+
 class ObjectIndentationErr(SyntaxErr):
     pass
+
 
 class TrailingContent(SyntaxErr):
     pass
 
+
 class UnsupportedYAML(ParserErr):
     pass
+
 
 class UnsupportedEscape(ParserErr):
     pass
@@ -153,6 +178,7 @@ def parse(buf, output=None, options=None):
 
     return obj
 
+
 def move_to_next(buf, pos):
     line_pos = pos
     next_line = False
@@ -160,22 +186,23 @@ def move_to_next(buf, pos):
         peek = buf[pos]
 
         if peek == ' ':
-            pos +=1
+            pos += 1
         elif peek == '\n' or peek == '\r':
-            pos +=1
+            pos += 1
             line_pos = pos
             next_line = True
         elif peek == '#':
             next_line = True
             while pos < len(buf):
-                pos +=1
+                pos += 1
                 if buf[pos] == '\r' or buf[pos] == '\n':
                     line_pos = pos
                     next_line = True
-                    break 
+                    break
         else:
             break
-    return pos, pos-line_pos, next_line
+    return pos, pos - line_pos, next_line
+
 
 def skip_whitespace(buf, pos, output):
     m = whitespace.match(buf, pos)
@@ -195,24 +222,34 @@ def parse_structure(buf, pos, output, options, indent=0, at_root=False):
     pos, my_indent, next_line = move_to_next(buf, pos)
 
     if my_indent < indent:
-        raise BadIndent(buf, pos, "The parser has gotten terribly confused, I'm sorry. Try re-indenting")
+        raise BadIndent(
+            buf, pos,
+            "The parser has gotten terribly confused, I'm sorry. Try re-indenting"
+        )
 
     output.write(buf[start:pos])
     peek = buf[pos]
 
     if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
-        raise UnsupportedYAML(buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
+        raise UnsupportedYAML(
+            buf, pos,
+            "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".
+            format(peek))
 
-    if peek == '-' and buf[pos:pos+3] == '---':
-        raise UnsupportedYAML(buf, pos, "A SafeYAML document is a single document, '---' separators are unsupported")
-    
+    if peek == '-' and buf[pos:pos + 3] == '---':
+        raise UnsupportedYAML(
+            buf, pos,
+            "A SafeYAML document is a single document, '---' separators are unsupported"
+        )
+
     if peek == '-':
         return parse_indented_list(buf, pos, output, options, my_indent)
 
     m = key_name.match(buf, pos)
 
     if peek == '"' or peek == '"' or m:
-        return parse_indented_map(buf, pos, output, options, my_indent, at_root)
+        return parse_indented_map(buf, pos, output, options, my_indent,
+                                  at_root)
 
     if peek == '{':
         return parse_map(buf, pos, output, options)
@@ -221,11 +258,18 @@ def parse_structure(buf, pos, output, options, indent=0, at_root=False):
 
     if peek in "+-0123456789":
         if at_root:
-            raise NoRootObject(buf, pos, "No root object found: expected object or list, found start of number")
+            raise NoRootObject(
+                buf, pos,
+                "No root object found: expected object or list, found start of number"
+            )
         else:
-            raise BadIndent(buf, pos, "Expected an indented object or indented list, but found start of number on next line.")
+            raise BadIndent(
+                buf, pos,
+                "Expected an indented object or indented list, but found start of number on next line."
+            )
 
-    raise SyntaxErr(buf, pos, "The parser has become terribly confused, I'm sorry")
+    raise SyntaxErr(buf, pos,
+                    "The parser has become terribly confused, I'm sorry")
 
 
 def parse_indented_list(buf, pos, output, options, my_indent):
@@ -234,19 +278,26 @@ def parse_indented_list(buf, pos, output, options, my_indent):
         if buf[pos] != '-':
             break
         output.write("-")
-        pos +=1
-        if buf[pos] not in (' ', '\r','\n'):
-            raise BadKey(buf, pos, "For indented lists i.e '- foo', the '-'  must be followed by ' ', or '\n', not: {}".format(buf[pos-1:pos+1]))
+        pos += 1
+        if buf[pos] not in (' ', '\r', '\n'):
+            raise BadKey(
+                buf, pos,
+                "For indented lists i.e '- foo', the '-'  must be followed by ' ', or '\n', not: {}".
+                format(buf[pos - 1:pos + 1]))
 
         new_pos, new_indent, next_line = move_to_next(buf, pos)
         if next_line and new_indent <= my_indent:
-            raise BadIndent(buf, new_pos, "Expecting a list item, but the next line isn't indented enough")
+            raise BadIndent(
+                buf, new_pos,
+                "Expecting a list item, but the next line isn't indented enough"
+            )
 
         if not next_line:
             output.write(buf[pos:new_pos])
             obj, pos = parse_value(buf, new_pos, output, options)
         else:
-            obj, pos = parse_structure(buf, pos, output, options, indent=my_indent)
+            obj, pos = parse_structure(
+                buf, pos, output, options, indent=my_indent)
 
         out.append(obj)
 
@@ -256,8 +307,9 @@ def parse_indented_list(buf, pos, output, options, my_indent):
         else:
             output.write(buf[pos:new_pos])
             pos = new_pos
-                
+
     return out, pos
+
 
 def parse_indented_map(buf, pos, output, options, my_indent, at_root):
     out = OrderedDict()
@@ -269,38 +321,55 @@ def parse_indented_map(buf, pos, output, options, my_indent, at_root):
 
         name, pos, is_bare = parse_key(buf, pos, output, options)
         if name in out:
-            raise DuplicateKey(buf,pos, "Can't have duplicate keys: {} is defined twice.".format(repr(name)))
+            raise DuplicateKey(
+                buf, pos,
+                "Can't have duplicate keys: {} is defined twice.".format(
+                    repr(name)))
 
         if buf[pos] != ':':
             if is_bare or not at_root:
-                raise BadKey(buf, pos, "Expected 'key:', but didn't find a ':', found {}".format(repr(buf[pos:])))
+                raise BadKey(
+                    buf, pos,
+                    "Expected 'key:', but didn't find a ':', found {}".format(
+                        repr(buf[pos:])))
             else:
-                raise NoRootObject(buf, pos, "Expected 'key:', but didn't find a ':', found a string {}. Note that strings must be inside a containing object or list, and cannot be root element".format(repr(buf[pos:])))
+                raise NoRootObject(
+                    buf, pos,
+                    "Expected 'key:', but didn't find a ':', found a string {}. Note that strings must be inside a containing object or list, and cannot be root element".
+                    format(repr(buf[pos:])))
 
         output.write(":")
-        pos +=1
-        if buf[pos] not in (' ', '\r','\n'):
+        pos += 1
+        if buf[pos] not in (' ', '\r', '\n'):
             if options.fix_nospace:
                 output.write(' ')
             else:
-                raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(name),repr(buf[pos:])))
+                raise BadKey(
+                    buf, pos,
+                    "For key {}, expected space or newline after ':', found {}.".
+                    format(repr(name), repr(buf[pos:])))
 
         handled_nodent = False
-        
+
         new_pos, new_indent, next_line = move_to_next(buf, pos)
         if next_line and new_indent <= my_indent:
             if options.fix_nodent and new_indent == my_indent:
                 handled_nodent = True
             else:
-                raise BadIndent(buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
+                raise BadIndent(
+                    buf, new_pos,
+                    "Missing value. Found a key, but the line afterwards isn't indented enough to count."
+                )
 
         if not next_line:
             output.write(buf[pos:new_pos])
             obj, pos = parse_value(buf, new_pos, output, options)
         else:
-            output.write(buf[pos:new_pos-new_indent])
-            if handled_nodent: output.write(' ')
-            obj, pos = parse_structure(buf, new_pos-new_indent, output, options, indent=my_indent)
+            output.write(buf[pos:new_pos - new_indent])
+            if handled_nodent:
+                output.write(' ')
+            obj, pos = parse_structure(
+                buf, new_pos - new_indent, output, options, indent=my_indent)
 
         # dupe check
         out[name] = obj
@@ -311,7 +380,7 @@ def parse_indented_map(buf, pos, output, options, my_indent, at_root):
         else:
             output.write(buf[pos:new_pos])
             pos = new_pos
-                
+
     return out, pos
 
 
@@ -321,11 +390,16 @@ def parse_value(buf, pos, output, options=None):
     peek = buf[pos]
 
     if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
-        raise UnsupportedYAML(buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
+        raise UnsupportedYAML(
+            buf, pos,
+            "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".
+            format(peek))
 
-    if peek == '-' and buf[pos:pos+3] == '---':
-        raise UnsupportedYAML(buf, pos, "A SafeYAML document is a single document, '---' separators are unsupported")
-    
+    if peek == '-' and buf[pos:pos + 3] == '---':
+        raise UnsupportedYAML(
+            buf, pos,
+            "A SafeYAML document is a single document, '---' separators are unsupported"
+        )
 
     if peek == '{':
         return parse_map(buf, pos, output, options)
@@ -351,29 +425,36 @@ def parse_map(buf, pos, output, options):
     comma = None
 
     while buf[pos] != '}':
-        
+
         key, new_pos, is_bare = parse_key(buf, pos, output, options)
 
         if key in out:
-            raise DuplicateKey(buf,pos, 'duplicate key: {}, {}'.format(key, out))
+            raise DuplicateKey(buf, pos, 'duplicate key: {}, {}'.format(
+                key, out))
 
         pos = skip_whitespace(buf, new_pos, output)
 
         peek = buf[pos]
 
-        ### bare key check
+        # bare key check
 
         if peek == ':':
             output.write(':')
             pos += 1
         else:
-            raise BadKey( buf, pos, "Expected a ':', when parsing a key: value pair but found {}".format(repr(peek)))
+            raise BadKey(
+                buf, pos,
+                "Expected a ':', when parsing a key: value pair but found {}".
+                format(repr(peek)))
 
-        if is_bare and buf[pos] not in (' ', '\r','\n'):
+        if is_bare and buf[pos] not in (' ', '\r', '\n'):
             if options.fix_nospace:
                 output.write(' ')
             else:
-                raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(repr(key),repr(buf[pos:])))
+                raise BadKey(
+                    buf, pos,
+                    "For key {}, expected space or newline after ':', found {}.".
+                    format(repr(key), repr(buf[pos:])))
 
         pos = skip_whitespace(buf, pos, output)
 
@@ -392,13 +473,16 @@ def parse_map(buf, pos, output, options):
             comma = True
             pos = skip_whitespace(buf, pos, output)
         elif peek != '}':
-            raise SyntaxErr(buf, pos, "Expecting a ',', or a '{}' but found {}".format('}',repr(peek)))
+            raise SyntaxErr(buf, pos,
+                            "Expecting a ',', or a '{}' but found {}".format(
+                                '}', repr(peek)))
 
     if options.force_commas:
-        if out and comma == False:
+        if out and not comma:
             output.write(',')
     output.write('}')
     return out, pos + 1
+
 
 def parse_key(buf, pos, output, options):
     m = identifier.match(buf, pos)
@@ -410,12 +494,18 @@ def parse_key(buf, pos, output, options):
             if options.force_string_keys:
                 item = '"{}"'.format(item)
             else:
-                raise BadKey(buf, pos,"Found '{}' as a bareword key, Please use quotes around it.".format(item))
+                raise BadKey(
+                    buf, pos,
+                    "Found '{}' as a bareword key, Please use quotes around it.".
+                    format(item))
         elif name in reserved_names:
             if options.force_string_keys:
                 item = '"{}"'.format(item)
             else:
-                raise ReservedKey(buf, pos,"Found '{}' as a bareword key, which can be parsed as a boolean. Please use quotes around it.".format(item))
+                raise ReservedKey(
+                    buf, pos,
+                    "Found '{}' as a bareword key, which can be parsed as a boolean. Please use quotes around it.".
+                    format(item))
         elif options.force_string_keys:
             item = '"{}"'.format(item)
 
@@ -425,6 +515,7 @@ def parse_key(buf, pos, output, options):
     else:
         name, pos = parse_string(buf, pos, output, options)
         return name, pos, False
+
 
 def parse_list(buf, pos, output, options):
     output.write("[")
@@ -449,14 +540,18 @@ def parse_list(buf, pos, output, options):
             pos += 1
             pos = skip_whitespace(buf, pos, output)
         elif peek != ']':
-            raise SyntaxErr( buf, pos, "Inside a [], Expecting a ',', or a ']' but found {}".format(repr(peek)))
+            raise SyntaxErr(
+                buf, pos,
+                "Inside a [], Expecting a ',', or a ']' but found {}".format(
+                    repr(peek)))
     if options.force_commas:
-        if out and comma == False:
+        if out and not comma:
             output.write(',')
     output.write("]")
     pos += 1
 
     return out, pos
+
 
 def parse_string(buf, pos, output, options):
     s = io.StringIO()
@@ -498,26 +593,26 @@ def parse_string(buf, pos, output, options):
         elif esc == 'u':
             n = int(buf[hi + 2:hi + 6], 16)
             if 0xD800 <= n <= 0xDFFF:
-                raise BadString(
-                    buf, hi, 'string cannot have surrogate pairs')
+                raise BadString(buf, hi, 'string cannot have surrogate pairs')
             s.write(chr(n))
             lo = hi + 6
         elif esc == 'U':
             n = int(buf[hi + 2:hi + 10], 16)
             if 0xD800 <= n <= 0xDFFF:
-                raise BadString(
-                    buf, hi, 'string cannot have surrogate pairs')
+                raise BadString(buf, hi, 'string cannot have surrogate pairs')
             s.write(chr(n))
             lo = hi + 10
         else:
-            raise UnsupportedEscape(
-                buf, hi, "Unkown escape character {}".format(repr(esc)))
+            raise UnsupportedEscape(buf, hi,
+                                    "Unkown escape character {}".format(
+                                        repr(esc)))
 
     out = s.getvalue()
 
     # XXX output.write string.escape
 
     return out, end
+
 
 def parse_number(buf, pos, output, options):
     flt_end = None
@@ -555,11 +650,13 @@ def parse_number(buf, pos, output, options):
     else:
         out = sign * int(buf[pos:end])
         if leading_zero and out != 0:
-            raise BadNumber(buf, pos, "Can't have leading zeros on non-zero integers")
+            raise BadNumber(buf, pos,
+                            "Can't have leading zeros on non-zero integers")
 
     output.write(buf[start:end])
 
     return out, end
+
 
 def parse_bareword(buf, pos, output, options):
     m = identifier.match(buf, pos)
@@ -576,9 +673,15 @@ def parse_bareword(buf, pos, output, options):
         elif options.fix_unquoted:
             pass
         elif item.lower() in reserved_names:
-            raise ReservedKey(buf, pos,"Can't use '{}' as a value. Please either surround it in quotes if it\'s a string, or replace it with `true` if it\'s a boolean.".format(item))
+            raise ReservedKey(
+                buf, pos,
+                "Can't use '{}' as a value. Please either surround it in quotes if it\'s a string, or replace it with `true` if it\'s a boolean.".
+                format(item))
         else:
-            raise Bareword(buf, pos, "{} doesn't look like 'true', 'false', or 'null', who are you kidding ".format(repr(item)))
+            raise Bareword(
+                buf, pos,
+                "{} doesn't look like 'true', 'false', or 'null', who are you kidding ".
+                format(repr(item)))
 
     if options.fix_unquoted:
         m = barewords.match(buf, pos)
@@ -586,38 +689,85 @@ def parse_bareword(buf, pos, output, options):
             end = m.end()
             item = buf[pos:end].strip()
             output.write('"{}"'.format(item))
-            if buf[end:end+1] not in ('', '\r', '\n', '#'):
-                raise Bareword(buf, pos, "The parser is trying its very best but could only make out '{}', but there is other junk on that line. You fix it.".format(item))
-            elif buf[end:end+1] == '#':
+            if buf[end:end + 1] not in ('', '\r', '\n', '#'):
+                raise Bareword(
+                    buf, pos,
+                    "The parser is trying its very best but could only make out '{}', but there is other junk on that line. You fix it.".
+                    format(item))
+            elif buf[end:end + 1] == '#':
                 output.write(' ')
 
             return item, m.end()
-    raise Bareword(buf, pos, "The parser doesn't know how to parse anymore and has given up. Use less barewords")
+    raise Bareword(
+        buf, pos,
+        "The parser doesn't know how to parse anymore and has given up. Use less barewords"
+    )
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="SafeYAML Linter, checks (or formats) a YAML file for common ambiguities")
+    parser = argparse.ArgumentParser(
+        description=
+        "SafeYAML Linter, checks (or formats) a YAML file for common ambiguities"
+    )
 
-    parser.add_argument("file", nargs="*", default=None, help="filename to read, without will read from stdin")
-    parser.add_argument("--fix",  action='store_true', default=False, help="ask the parser to hog wild")
-    parser.add_argument("--fix-unquoted",  action='store_true', default=False, help="ask the parser to try its best to parse unquoted strings/barewords")
-    parser.add_argument("--fix-nodent",  action='store_true', default=False, help="fix lists to nest inside maps with same indent")
-    parser.add_argument("--fix-nospace",  action='store_true', default=False, help="fix map keys not to have ' ' after a ':'")
-    parser.add_argument("--force-string-keys",  action='store_true', default=False, help="quote every bareword")
-    parser.add_argument("--force-commas",  action='store_true', default=False, help="trailing commas")
-    parser.add_argument("--quiet", action='store_true', default=False, help="don't print cleaned file")
-    parser.add_argument("--in-place", action='store_true', default=False, help="edit file")
+    parser.add_argument(
+        "file",
+        nargs="*",
+        default=None,
+        help="filename to read, without will read from stdin")
+    parser.add_argument(
+        "--fix",
+        action='store_true',
+        default=False,
+        help="ask the parser to hog wild")
+    parser.add_argument(
+        "--fix-unquoted",
+        action='store_true',
+        default=False,
+        help=
+        "ask the parser to try its best to parse unquoted strings/barewords")
+    parser.add_argument(
+        "--fix-nodent",
+        action='store_true',
+        default=False,
+        help="fix lists to nest inside maps with same indent")
+    parser.add_argument(
+        "--fix-nospace",
+        action='store_true',
+        default=False,
+        help="fix map keys not to have ' ' after a ':'")
+    parser.add_argument(
+        "--force-string-keys",
+        action='store_true',
+        default=False,
+        help="quote every bareword")
+    parser.add_argument(
+        "--force-commas",
+        action='store_true',
+        default=False,
+        help="trailing commas")
+    parser.add_argument(
+        "--quiet",
+        action='store_true',
+        default=False,
+        help="don't print cleaned file")
+    parser.add_argument(
+        "--in-place", action='store_true', default=False, help="edit file")
 
-    parser.add_argument("--json", action='store_true', default=False, help="output json instead of yaml")
+    parser.add_argument(
+        "--json",
+        action='store_true',
+        default=False,
+        help="output json instead of yaml")
 
-    args = parser.parse_args() # will only return when action is given
-    
+    args = parser.parse_args()  # will only return when action is given
+
     options = Options(
-            fix_unquoted=args.fix_unquoted or args.fix,
-            fix_nodent=args.fix_nodent or args.fix,
-            fix_nospace=args.fix_nospace or args.fix,
-            force_string_keys=args.force_string_keys,
-            force_commas=args.force_commas,
+        fix_unquoted=args.fix_unquoted or args.fix,
+        fix_nodent=args.fix_nodent or args.fix,
+        fix_nospace=args.fix_nospace or args.fix,
+        force_string_keys=args.force_string_keys,
+        force_commas=args.force_commas,
     )
 
     if args.in_place:
@@ -638,7 +788,9 @@ if __name__ == '__main__':
                     obj = parse(fh.read(), output=output, options=options)
                 except ParserErr as p:
                     line, col = get_position(p.buf, p.pos)
-                    print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
+                    print(
+                        "{}:{}:{}:{}".format(filename, line, col, p.explain()),
+                        file=sys.stderr)
                     sys.exit(-2)
                 else:
                     fh.seek(0)
@@ -651,11 +803,13 @@ if __name__ == '__main__':
 
         if args.file:
             if len(args.file) > 1:
-                print('error: safeyaml only takes one file as argument, unless --in-place given')
+                print(
+                    'error: safeyaml only takes one file as argument, unless --in-place given'
+                )
                 print()
                 sys.exit(-1)
 
-            input_fh = open(args.file[0]) # closed on exit
+            input_fh = open(args.file[0])  # closed on exit
             filename = args.file
 
         try:
@@ -663,7 +817,9 @@ if __name__ == '__main__':
             obj = parse(input_fh.read(), output=output, options=options)
         except ParserErr as p:
             line, col = get_position(p.buf, p.pos)
-            print("{}:{}:{}:{}".format(filename, line, col, p.explain()), file=sys.stderr)
+            print(
+                "{}:{}:{}:{}".format(filename, line, col, p.explain()),
+                file=sys.stderr)
             sys.exit(-2)
 
         if not args.quiet:
@@ -674,4 +830,3 @@ if __name__ == '__main__':
                 output_fh.write(output.getvalue())
 
     sys.exit(0)
-

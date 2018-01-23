@@ -7,17 +7,25 @@ import pytest
 import safeyaml
 
 SMOKE_TESTS = {
-    """ [0] """:            [0],
-    """ [1.2] """:          [1.2],
-    """ [-3.4] """:         [-3.4],
-    """ [+5.6] """:         [+5.6],
-    """ "test": 1 """:      {'test':1},
-    """ x: 'test' """:      {'x':'test'},
-    """ [1 ,2,3] """:       [1,2,3],
-    """ [1,2,3,] """:       [1,2,3],
-    """ {"a":1} """:        {'a':1},
-    """ {'b':2,} """:       {'b':2},
-    """ [1  #foo\n] """:    [1],
+    """ [0] """: [0],
+    """ [1.2] """: [1.2],
+    """ [-3.4] """: [-3.4],
+    """ [+5.6] """: [+5.6],
+    """ "test": 1 """: {
+        'test': 1
+    },
+    """ x: 'test' """: {
+        'x': 'test'
+    },
+    """ [1 ,2,3] """: [1, 2, 3],
+    """ [1,2,3,] """: [1, 2, 3],
+    """ {"a":1} """: {
+        'a': 1
+    },
+    """ {'b':2,} """: {
+        'b': 2
+    },
+    """ [1  #foo\n] """: [1],
 }
 
 
@@ -70,15 +78,15 @@ def check_file(path, validate=False, fix=False):
         if validate:
             try:
                 ref_obj = yaml.load(contents)
-            except:
-                raise Exception("input isn't valid YAML: {}".format(contents))
+            except yaml.YAMLError:
+                raise Exception("input isn't valid YAML:\n{}".format(contents))
 
             assert obj == ref_obj
 
             try:
                 parsed_output = yaml.load(output)
-            except Exception as e:
-                raise Exception("output isn't valid YAML: {}".format(output))
+            except yaml.YAMLError:
+                raise Exception("output isn't valid YAML:\n{}".format(output))
 
             assert parsed_output == ref_obj
 
