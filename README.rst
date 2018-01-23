@@ -20,6 +20,8 @@ It's best described as JSON plus the following:
 - Single-line comments with ``#``
 - Trailing commas allowed within ``[]`` or ``{}``
 
+More details are in the specification ``safeyaml.md``
+
 Here's an example::
 
   title: "SafeYAML Example"
@@ -107,23 +109,25 @@ Don't. That's not what YAML is for. Generate JSON if you need to serialize data.
 Repairing YAML
 --------------
 
-Here's an example with errors, being fixed automatically::
+``safeyaml`` can repair some problems within YAML files automatically.
+
+Here's an example file that has some errors and some ambiguity::
 
   $ cat input.yaml 
-  name: key
-  setting:{a:1,b:2}
-  off:on
-  yes:
-  - no
+  name: key                     # Bareword key
+  setting:{a:1,b:2}             # Missing ' ' after ':'
+  off:on                        # Ambigious key, ambigious value
+  yes:                          # Ambigious key
+  - no                          # SafeYAML requires `- no` to be indented
   
-  $ ./safeyaml input.yaml --fix-barewords --fix-nospace --fix-nodent --force-strings
+  $ ./safeyaml input.yaml --fix-unquoted --fix-nospace --fix-nodent --force-string-keys
   "name": "key"
   "setting": {"a": 1,"b": 2}
   "off": "on"
   "yes":
    - "no"
 
-``--fix-barewords`` enables two things. Bareword keys must still be in identifier format (a1.b2.c2 etc), but it replaces any reserved name ('true' etc) with the string ``"true"``. For values, it allows barewords until the end of line when inside an indented map.
+``--fix-unquoted`` will allow unquoted values inside an indented map. This does not affect map keys (which must still be in identifier format, i.e ``a1.b2.c2``).
 
 ``--fix-nospace`` ensures that all keys are followed by ``: ``.
 
@@ -131,7 +135,7 @@ Here's an example with errors, being fixed automatically::
 
 ``--fix`` enables all ``--fix-*`` options
 
-``--force-strings`` turns every bareword into a string.
+``--force-string-keys`` turns every key into a string. This will replace any key that has a boolean or null ('true' etc) with the string version (i.e ``"true"``).  
 
 ``--force-commas`` ensures every non-empty list or map has a trailing comma.
 
