@@ -11,7 +11,6 @@ from collections import OrderedDict
 whitespace = re.compile(r"(?:\ |\t|\r|\n)+")
 
 comment = re.compile(r"(#[^\r\n]*(?:\r?\n|$))+")
-import sys
 
 int_b10 = re.compile(r"\d[\d]*")
 flt_b10 = re.compile(r"\.[\d]+")
@@ -445,7 +444,7 @@ def parse_map(buf, pos, output, options):
                 buf, pos, "Expecting a ',', or a '{}' but found {}".format('}', repr(peek)))
 
     if options.force_commas:
-        if out and comma == False:
+        if out and not comma:
             output.write(',')
     output.write('}')
     return out, pos + 1
@@ -506,7 +505,7 @@ def parse_list(buf, pos, output, options):
             raise SyntaxErr(
                 buf, pos, "Inside a [], Expecting a ',', or a ']' but found {}".format(repr(peek)))
     if options.force_commas:
-        if out and comma == False:
+        if out and not comma:
             output.write(',')
     output.write("]")
     pos += 1

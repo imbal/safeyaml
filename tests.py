@@ -70,15 +70,15 @@ def check_file(path, validate=False, fix=False):
         if validate:
             try:
                 ref_obj = yaml.load(contents)
-            except:
-                raise Exception("input isn't valid YAML: {}".format(contents))
+            except yaml.YAMLError:
+                raise Exception("input isn't valid YAML:\n{}".format(contents))
 
             assert obj == ref_obj
 
             try:
                 parsed_output = yaml.load(output)
-            except Exception as e:
-                raise Exception("output isn't valid YAML: {}".format(output))
+            except yaml.YAMLError:
+                raise Exception("output isn't valid YAML:\n{}".format(output))
 
             assert parsed_output == ref_obj
 
