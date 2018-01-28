@@ -23,7 +23,7 @@ SMOKE_TESTS = {
 
 @pytest.mark.parametrize("code,ref_obj", SMOKE_TESTS.items())
 def test_smoke(code, ref_obj):
-    obj = safeyaml.parse(code)
+    obj = safeyaml.parse(code)[0]
     assert obj == ref_obj
 
 
@@ -63,7 +63,7 @@ def check_file(path, validate=False, fix=False):
         )
 
         output = io.StringIO()
-        obj = safeyaml.parse(contents, output=output, options=options)
+        obj = safeyaml.parse(contents, output=output, options=options)[0]
         output = output.getvalue()
 
         if validate:

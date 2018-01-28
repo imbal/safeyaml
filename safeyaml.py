@@ -152,6 +152,21 @@ def parse(buf, output=None, options=None):
     options = options or Options()
     pos = 1 if buf.startswith("\uFEFF") else 0
 
+    out = []
+    while pos != len(buf):
+        obj, pos = parse_document(buf, pos, output, options)
+        out.append(obj)
+
+        if buf[pos:pos+3] == '---':
+            output.write(buf[pos:pos+3])
+            pos += 3
+        elif pos < len(buf):
+            raise TrailingContent(buf, pos, "Trailing content: {}".format(
+                repr(buf[pos:pos + 10])))
+
+    return out
+
+def parse_document(buf, pos, output, options):
     obj, pos = parse_structure(buf, pos, output, options, at_root=True)
 
     start = pos
@@ -163,12 +178,8 @@ def parse(buf, output=None, options=None):
             pos = m.end()
             m = whitespace.match(buf, pos)
     output.write(buf[start:pos])
+    return obj, pos
 
-    if pos != len(buf):
-        raise TrailingContent(buf, pos, "Trailing content: {}".format(
-            repr(buf[pos:pos + 10])))
-
-    return obj
 
 def peek_line(buf,pos):
     start = pos
@@ -218,23 +229,26 @@ def skip_whitespace(buf, pos, output):
 
 
 def parse_structure(buf, pos, output, options, indent=0, at_root=False):
-    start = pos
-    pos, my_indent, next_line = move_to_next(buf, pos)
+    while True:
+        start = pos
+        pos, my_indent, next_line = move_to_next(buf, pos)
 
-    if my_indent < indent:
-        raise BadIndent(
-            buf, pos, "The parser has gotten terribly confused, I'm sorry. Try re-indenting")
+        if my_indent < indent:
+            raise BadIndent(
+                buf, pos, "The parser has gotten terribly confused, I'm sorry. Try re-indenting")
 
-    output.write(buf[start:pos])
-    peek = buf[pos]
+        output.write(buf[start:pos])
+        peek = buf[pos]
 
-    if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
-        raise UnsupportedYAML(
-            buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
+        if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
+            raise UnsupportedYAML(
+                buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
 
-    if peek == '-' and buf[pos:pos + 3] == '---':
-        raise UnsupportedYAML(
-            buf, pos, "A SafeYAML document is a single document, '---' separators are unsupported")
+        if peek == '-' and buf[pos:pos + 3] == '---':
+            output.write(buf[pos:pos+3])
+            pos += 3
+            continue
+        break
 
     if peek == '-':
         return parse_indented_list(buf, pos, output, options, my_indent)
@@ -301,11 +315,12 @@ def parse_indented_list(buf, pos, output, options, my_indent):
         out.append(obj)
 
         new_pos, new_indent, next_line = move_to_next(buf, pos)
-        if not next_line or new_indent != my_indent:
-            break
-        else:
+        if next_line and new_indent == my_indent and buf[new_pos:new_pos+1] == '-':
             output.write(buf[pos:new_pos])
             pos = new_pos
+            continue
+
+        break
 
     return out, pos
 
