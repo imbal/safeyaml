@@ -75,7 +75,6 @@ class ParserErr(Exception):
 
     def explain(self):
         return self.reason
-        return "{}:{}".format(self.name(), self.reason)
 
     def __init__(self, buf, pos, reason=None):
         self.buf = buf
@@ -385,7 +384,7 @@ def parse_value(buf, pos, output, options=None):
     else:
         return parse_bareword(buf, pos, output, options)
 
-    raise ParserErr(buf, pos, "Bug in parser, sorry")
+    # raise ParserErr(buf, pos, "Bug in parser, sorry")
 
 
 def parse_map(buf, pos, output, options):
