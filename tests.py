@@ -59,7 +59,6 @@ def check_file(path, validate=False, fix=False):
 
         options = safeyaml.Options(
             fix_unquoted=fix,
-            fix_nodent=fix,
             fix_nospace=fix,
         )
 
