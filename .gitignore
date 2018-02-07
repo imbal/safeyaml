@@ -1,4 +1,6 @@
 __pycache__
+.pytest_cache
 .tox
 .cache
 Pipfile.lock
+*.egg-info

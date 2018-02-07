@@ -2,6 +2,8 @@
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 
+[packages]
+PyYAML = "*"
+
 [dev-packages]
 pytest = "*"
-PyYAML = "*"
