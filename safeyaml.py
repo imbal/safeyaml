@@ -61,9 +61,8 @@ def get_position(buf, pos):
 
 
 class Options:
-    def __init__(self, fix_unquoted=False, fix_nodent=False, fix_nospace=False, force_string_keys=False, force_commas=False):
+    def __init__(self, fix_unquoted=False, fix_nospace=False, force_string_keys=False, force_commas=False):
         self.fix_unquoted = fix_unquoted
-        self.fix_nodent = fix_nodent
         self.fix_nospace = fix_nospace
         self.force_string_keys = force_string_keys
         self.force_commas = force_commas
@@ -153,6 +152,21 @@ def parse(buf, output=None, options=None):
     options = options or Options()
     pos = 1 if buf.startswith("\uFEFF") else 0
 
+    out = []
+    while pos != len(buf):
+        obj, pos = parse_document(buf, pos, output, options)
+        out.append(obj)
+
+        if buf[pos:pos+3] == '---':
+            output.write(buf[pos:pos+3])
+            pos += 3
+        elif pos < len(buf):
+            raise TrailingContent(buf, pos, "Trailing content: {}".format(
+                repr(buf[pos:pos + 10])))
+
+    return out
+
+def parse_document(buf, pos, output, options):
     obj, pos = parse_structure(buf, pos, output, options, at_root=True)
 
     start = pos
@@ -164,12 +178,16 @@ def parse(buf, output=None, options=None):
             pos = m.end()
             m = whitespace.match(buf, pos)
     output.write(buf[start:pos])
+    return obj, pos
 
-    if pos != len(buf):
-        raise TrailingContent(buf, pos, "Trailing content: {}".format(
-            repr(buf[pos:pos + 10])))
 
-    return obj
+def peek_line(buf,pos):
+    start = pos
+    while pos < len(buf):
+        peek = buf[pos]
+        if peek in ('\r','\n'): break
+        pos +=1
+    return buf[start:pos]
 
 
 def move_to_next(buf, pos):
@@ -211,23 +229,26 @@ def skip_whitespace(buf, pos, output):
 
 
 def parse_structure(buf, pos, output, options, indent=0, at_root=False):
-    start = pos
-    pos, my_indent, next_line = move_to_next(buf, pos)
+    while True:
+        start = pos
+        pos, my_indent, next_line = move_to_next(buf, pos)
 
-    if my_indent < indent:
-        raise BadIndent(
-            buf, pos, "The parser has gotten terribly confused, I'm sorry. Try re-indenting")
+        if my_indent < indent:
+            raise BadIndent(
+                buf, pos, "The parser has gotten terribly confused, I'm sorry. Try re-indenting")
 
-    output.write(buf[start:pos])
-    peek = buf[pos]
+        output.write(buf[start:pos])
+        peek = buf[pos]
 
-    if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
-        raise UnsupportedYAML(
-            buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
+        if peek in ('*', '&', '?', '|', '<', '>', '%', '@'):
+            raise UnsupportedYAML(
+                buf, pos, "I found a {} outside of quotes. It's too special to let pass. Anchors, References, and other directives are not valid SafeYAML, Sorry.".format(peek))
 
-    if peek == '-' and buf[pos:pos + 3] == '---':
-        raise UnsupportedYAML(
-            buf, pos, "A SafeYAML document is a single document, '---' separators are unsupported")
+        if peek == '-' and buf[pos:pos + 3] == '---':
+            output.write(buf[pos:pos+3])
+            pos += 3
+            continue
+        break
 
     if peek == '-':
         return parse_indented_list(buf, pos, output, options, my_indent)
@@ -280,7 +301,13 @@ def parse_indented_list(buf, pos, output, options, my_indent):
 
         if not next_line:
             output.write(buf[pos:new_pos])
-            obj, pos = parse_value(buf, new_pos, output, options)
+            line = peek_line(buf,pos)
+            if ': ' in line:
+                new_indent = my_indent + 1 +(new_pos-pos)
+                obj, pos = parse_indented_map(buf, new_pos, output, options, new_indent, at_root=False)
+            else:
+                obj, pos = parse_value(buf, new_pos, output, options)
+
         else:
             obj, pos = parse_structure(
                 buf, pos, output, options, indent=my_indent)
@@ -288,11 +315,12 @@ def parse_indented_list(buf, pos, output, options, my_indent):
         out.append(obj)
 
         new_pos, new_indent, next_line = move_to_next(buf, pos)
-        if not next_line or new_indent != my_indent:
-            break
-        else:
+        if next_line and new_indent == my_indent and buf[new_pos:new_pos+1] == '-':
             output.write(buf[pos:new_pos])
             pos = new_pos
+            continue
+
+        break
 
     return out, pos
 
@@ -327,23 +355,16 @@ def parse_indented_map(buf, pos, output, options, my_indent, at_root):
                 raise BadKey(buf, pos, "For key {}, expected space or newline after ':', found {}.".format(
                     repr(name), repr(buf[pos:])))
 
-        handled_nodent = False
-
         new_pos, new_indent, next_line = move_to_next(buf, pos)
-        if next_line and new_indent <= my_indent:
-            if options.fix_nodent and new_indent == my_indent:
-                handled_nodent = True
-            else:
-                raise BadIndent(
-                    buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
+        if next_line and new_indent < my_indent:
+            raise BadIndent(
+                buf, new_pos, "Missing value. Found a key, but the line afterwards isn't indented enough to count.")
 
         if not next_line:
             output.write(buf[pos:new_pos])
             obj, pos = parse_value(buf, new_pos, output, options)
         else:
             output.write(buf[pos:new_pos - new_indent])
-            if handled_nodent:
-                output.write(' ')
             obj, pos = parse_structure(
                 buf, new_pos - new_indent, output, options, indent=my_indent)
 
@@ -668,8 +689,6 @@ if __name__ == '__main__':
                         default=False, help="ask the parser to hog wild")
     parser.add_argument("--fix-unquoted",  action='store_true', default=False,
                         help="ask the parser to try its best to parse unquoted strings/barewords")
-    parser.add_argument("--fix-nodent",  action='store_true', default=False,
-                        help="fix lists to nest inside maps with same indent")
     parser.add_argument("--fix-nospace",  action='store_true',
                         default=False, help="fix map keys not to have ' ' after a ':'")
     parser.add_argument("--force-string-keys",  action='store_true',
@@ -688,7 +707,6 @@ if __name__ == '__main__':
 
     options = Options(
         fix_unquoted=args.fix_unquoted or args.fix,
-        fix_nodent=args.fix_nodent or args.fix,
         fix_nospace=args.fix_nospace or args.fix,
         force_string_keys=args.force_string_keys,
         force_commas=args.force_commas,
