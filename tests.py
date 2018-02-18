@@ -1,3 +1,4 @@
+import fnmatch
 import io
 import os
 import glob
@@ -27,10 +28,9 @@ def check_file(path, validate=False, fix=False):
         with pytest.raises(subprocess.CalledProcessError) as excinfo:
             safeyaml(path, fix=fix)
 
-        # FIXME: error formatting doesn't work yet
-        # error = excinfo.value
-        # assert error.stdout == b''
-        # assert error.stderr == expected_output
+        error = excinfo.value
+        assert error.stdout.decode('utf-8') == ''
+        assert_errors_match(expected_output, error.stderr.decode('utf-8'), path=path)
         return
 
     output = safeyaml(path, fix=fix)
@@ -40,6 +40,21 @@ def check_file(path, validate=False, fix=False):
         with open(output_file) as fh:
             expected_output = fh.read()
             assert output == expected_output
+
+
+def assert_errors_match(expected_output, actual_output, **format_vars):
+    pattern_lines = expected_output.split("\n")
+    output_lines = actual_output.split("\n")
+    
+    assert len(pattern_lines) == len(output_lines), \
+        "Expected {} lines of output, got {}:\n{}" \
+        .format(len(pattern_lines), len(output_lines), actual_output)
+
+    for pattern, line in zip(pattern_lines, output_lines):
+        pattern = pattern.format(**format_vars)
+        assert fnmatch.fnmatch(line, pattern), \
+            "Expected line:\n\n    {}\n\nto match pattern:\n\n    {}\n" \
+            .format(line, pattern)
 
 
 def safeyaml(path, fix=False):

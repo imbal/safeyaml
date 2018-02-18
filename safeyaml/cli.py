@@ -6,6 +6,8 @@ from .parser import Options
 from .parser import ParserErr
 from .parser import parse
 
+from . import precheck
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -54,12 +56,18 @@ def main():
         for filename in args.file:
             with open(filename, 'r+') as fh:
                 try:
+                    source = fh.read()
+                    precheck.check(source)
                     output = io.StringIO()
-                    obj = parse(fh.read(), output=output, options=options)
+                    obj = parse(source, output=output, options=options)
+                except precheck.PrecheckFailed as p:
+                    report_precheck_issues(p.issues, filename, sys.stderr)
+                    sys.exit(-2)
                 except ParserErr as p:
                     line, col = p.position()
-                    print("{}:{}:{}:{}".format(filename, line,
-                                               col, p.explain()), file=sys.stderr)
+                    print("{}:{}:{}:{}:{}".format(
+                        filename, line, col, p.__class__.__name__, p.explain()),
+                        file=sys.stderr)
                     sys.exit(-2)
                 else:
                     fh.seek(0)
@@ -78,15 +86,26 @@ def main():
                 sys.exit(-1)
 
             input_fh = open(args.file[0])  # closed on exit
-            filename = args.file
+            filename = args.file[0]
 
         try:
-            output = io.StringIO()
-            obj = parse(input_fh.read(), output=output, options=options)
+            source = input_fh.read()
+
+            if args.fix:
+                output = precheck.fix(source)
+            else:
+                precheck.check(source)
+                output = ""
+
+            obj = parse(source, options=options)
+        except precheck.PrecheckFailed as p:
+            report_precheck_issues(p.issues, filename, sys.stderr)
+            sys.exit(-2)
         except ParserErr as p:
             line, col = p.position()
-            print("{}:{}:{}:{}".format(filename, line,
-                                       col, p.explain()), file=sys.stderr)
+            print("{}:{}:{}:{}:{}".format(
+                filename, line, col, p.__class__.__name__, p.explain()),
+                file=sys.stderr)
             sys.exit(-2)
 
         if not args.quiet:
@@ -94,6 +113,13 @@ def main():
             if args.json:
                 json.dump(obj, output_fh)
             else:
-                output_fh.write(output.getvalue())
+                output_fh.write(output)
 
     sys.exit(0)
+
+
+def report_precheck_issues(issues, filename, output):
+    for i in issues:
+        print("{}:{}:{}:{}".format(
+            filename, i.line(), i.col(), i.explain()),
+            file=output)
