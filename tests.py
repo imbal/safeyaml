@@ -68,4 +68,4 @@ def safeyaml(path, fix=False):
 
 
 if __name__ == '__main__':
-    pytest.main(['-q', __file__])
+    pytest.main([__file__])
